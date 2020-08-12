@@ -1,0 +1,54 @@
+# Asus configuration options
+
+config MACH_ASUS
+	bool "Asus devices"
+	help
+	  Support for Asus devices
+
+config MACH_ASUS_2017
+	bool "Asus 2017 devices"
+	select MACH_ASUS
+	help
+	  Support for Asus 2017 devices
+
+config MACH_ASUS_2018
+	bool "Asus 2018 devices"
+	select MACH_ASUS
+	help
+	  Support for Asus 2018 devices
+
+menu "Asus board selection"
+
+config MACH_ASUS_X00H
+        bool "X00H board"
+        select MACH_ASUS_2017
+        help
+          Support for Asus Zenfone 4 Max
+          Codename: X00H
+          SoCs: MSM8917/MSM8937
+
+config MACH_ASUS_X00I
+        bool "X00I board"
+        select MACH_ASUS_2017
+        help
+          Support for Asus Zenfone 4 Max
+          Codename: X00I
+          SoCs: MSM8917/MSM8937
+
+config MACH_ASUS_X00P
+        bool "X00P board"
+        select MACH_ASUS_2018
+        help
+          Support for Asus Zenfone Max M1
+          Codename: X00P
+          SoCs: MSM8917/MSM8937
+
+config MACH_ASUS_X00R
+        bool "X00R board"
+        select MACH_ASUS_2018
+        help
+          Support for Asus Zenfone Live L1
+          Codename: X00R
+          SoCs: MSM8917/MSM8937
+
+endmenu
