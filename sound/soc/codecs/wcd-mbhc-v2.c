@@ -506,7 +506,12 @@ static void wcd_mbhc_set_and_turnoff_hph_padac(struct wcd_mbhc *mbhc)
 	} else {
 		pr_debug("%s PA is off\n", __func__);
 	}
+	#ifdef CONFIG_AUDIO_PA_FLAG
+	WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_HPHR_PA_EN, 1);
+	WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_HPHL_PA_EN, 1);
+	#else
 	WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_HPH_PA_EN, 0);
+	#endif
 	usleep_range(wg_time * 1000, wg_time * 1000 + 50);
 }
 
@@ -600,7 +605,9 @@ static void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 			 jack_type, mbhc->hph_status);
 		wcd_mbhc_jack_report(mbhc, &mbhc->headset_jack,
 				mbhc->hph_status, WCD_MBHC_JACK_MASK);
+		#ifndef CONFIG_AUDIO_PA_FLAG
 		wcd_mbhc_set_and_turnoff_hph_padac(mbhc);
+		#endif
 		hphrocp_off_report(mbhc, SND_JACK_OC_HPHR);
 		hphlocp_off_report(mbhc, SND_JACK_OC_HPHL);
 		mbhc->current_plug = MBHC_PLUG_TYPE_NONE;
@@ -834,7 +841,11 @@ static void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
 						SND_JACK_HEADPHONE);
 			if (mbhc->current_plug == MBHC_PLUG_TYPE_HEADSET)
 				wcd_mbhc_report_plug(mbhc, 0, SND_JACK_HEADSET);
+		#ifdef CONFIG_MACH_ASUS_2017
+		wcd_mbhc_report_plug(mbhc, 1, SND_JACK_HEADSET);
+		#else
 		wcd_mbhc_report_plug(mbhc, 1, SND_JACK_UNSUPPORTED);
+		#endif
 	} else if (plug_type == MBHC_PLUG_TYPE_HEADSET) {
 		if (mbhc->mbhc_cfg->enable_anc_mic_detect)
 			anc_mic_found = wcd_mbhc_detect_anc_plug_type(mbhc);
@@ -1095,7 +1106,11 @@ static void wcd_enable_mbhc_supply(struct wcd_mbhc *mbhc,
 		} else if (plug_type == MBHC_PLUG_TYPE_HEADPHONE) {
 			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_CS);
 		} else {
+			#ifdef CONFIG_MACH_ASUS_2017
+			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_MB);
+			#else
 			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_NONE);
+			#endif
 		}
 	}
 }
