@@ -18,11 +18,29 @@
 #include "msm_cci.h"
 #include "msm_camera_dt_util.h"
 
+#ifdef CONFIG_MACH_ASUS_2018
+#include "linux/module.h"
+#include "linux/sched.h"
+#include "linux/fs.h"
+#include "linux/proc_fs.h"
+#include "linux/seq_file.h"
+#include "linux/uaccess.h"
+#endif
+
 /* Logging macro */
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
 #define SENSOR_MAX_MOUNTANGLE (360)
+
+#ifdef CONFIG_MACH_ASUS_2018
+extern int front_camera;
+extern int back_camera;
+extern int main2_camera;
+#ifdef CONFIG_MACH_ASUS_X00P
+extern int msm_platform;
+#endif
+#endif
 
 static struct v4l2_file_operations msm_sensor_v4l2_subdev_fops;
 static int32_t msm_sensor_driver_platform_probe(struct platform_device *pdev);
@@ -1374,6 +1392,32 @@ static struct i2c_driver msm_sensor_driver_i2c = {
 	},
 };
 
+#ifdef CONFIG_MACH_ASUS_2018
+static int camera_proc_show(struct seq_file *m, void *v)
+{
+	#ifdef CONFIG_MACH_ASUS_X00P
+	seq_printf(m,"%dM-%dM+%dM\n",front_camera,back_camera,main2_camera);
+	#endif
+	#ifdef CONFIG_MACH_ASUS_X00R
+	seq_printf(m,"%dM-%dM\n",front_camera,back_camera);
+	#endif
+    return 0;
+}
+
+static int camera_proc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, camera_proc_show, NULL);
+}
+
+static const struct file_operations camera_res_fops = {
+	.owner		= THIS_MODULE,
+	.open		= camera_proc_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+#endif
+
 static int __init msm_sensor_driver_init(void)
 {
 	int32_t rc = 0;
@@ -1387,14 +1431,33 @@ static int __init msm_sensor_driver_init(void)
 	if (rc)
 		pr_err("%s i2c_add_driver failed rc = %d",  __func__, rc);
 
+	#ifdef CONFIG_MACH_ASUS_2018
+	proc_create("driver/camera_res", 0660, NULL, &camera_res_fops);
+	#endif
+
 	return rc;
 }
+
+#ifdef CONFIG_MACH_ASUS_X00P
+static int __init platform_choose(char *str){
+	if(!strcmp(str,"msm8917"))	{
+		msm_platform = 8917;
+	}else if(!strcmp(str,"msm8937")){
+		msm_platform = 8937;
+	}
+	return 0;
+}
+__setup("androidboot.platformtype=", platform_choose);
+#endif
 
 static void __exit msm_sensor_driver_exit(void)
 {
 	CDBG("Enter");
 	platform_driver_unregister(&msm_sensor_platform_driver);
 	i2c_del_driver(&msm_sensor_driver_i2c);
+	#ifdef CONFIG_MACH_ASUS_2018
+	remove_proc_entry("driver/camera_res",NULL);
+	#endif
 	return;
 }
 
