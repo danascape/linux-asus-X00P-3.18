@@ -366,6 +366,11 @@ struct pwm_config_data {
 	bool	pwm_enabled;
 	bool use_blink;
 	bool blinking;
+	#ifdef CONFIG_MACH_ASUS_2017
+	bool pwm_use_blink;
+	unsigned long  pwm_blink_onms;
+	unsigned long  pwm_blink_offms;
+	#endif
 };
 
 /**
@@ -572,6 +577,10 @@ static struct pwm_device *kpdbl_master;
 static u32 kpdbl_master_period_us;
 DECLARE_BITMAP(kpdbl_leds_in_use, NUM_KPDBL_LEDS);
 static bool is_kpdbl_master_turn_on;
+
+#ifdef CONFIG_MACH_ASUS_2018
+static unsigned long greenLedBlinking =0;
+#endif
 
 static int
 qpnp_led_masked_write(struct qpnp_led_data *led, u16 addr, u8 mask, u8 val)
@@ -915,8 +924,34 @@ static int qpnp_mpp_set(struct qpnp_led_data *led)
 			}
 		}
 		if (led->mpp_cfg->pwm_mode == PWM_MODE) {
+			#ifdef CONFIG_MACH_ASUS_2017
+			if(led->cdev.blink_brightness) {
+				period_us = (led->cdev.blink_delay_on + led->cdev.blink_delay_off)*1000;
+				duty_us = led->cdev.blink_delay_on*1000 ;
+				printk("chz period_us =%d ,duty_us=%d \n",period_us,duty_us);
+				if (period_us > INT_MAX / NSEC_PER_USEC) {
+					rc = pwm_config_us(
+						led->mpp_cfg->pwm_cfg->pwm_dev,
+						duty_us,
+						period_us);
+				} else {
+					duty_ns=duty_us*NSEC_PER_USEC;
+					rc = pwm_config(
+						led->mpp_cfg->pwm_cfg->pwm_dev,
+						duty_ns,
+						period_us * NSEC_PER_USEC);
+				}
+			} else {
+			#endif
 			/*config pwm for brightness scaling*/
 			period_us = led->mpp_cfg->pwm_cfg->pwm_period_us;
+            #ifdef CONFIG_MACH_ASUS_2018
+            if(greenLedBlinking)
+            {
+                period_us = 2500000; // 2.5s
+                printk("[wjwind] period_us = %d, led->cdev.brightness = %d \n",period_us,led->cdev.brightness);
+            }
+            #endif
 			if (period_us > INT_MAX / NSEC_PER_USEC) {
 				duty_us = (period_us * led->cdev.brightness) /
 					LED_FULL;
@@ -932,6 +967,9 @@ static int qpnp_mpp_set(struct qpnp_led_data *led)
 					duty_ns,
 					period_us * NSEC_PER_USEC);
 			}
+			#ifdef CONFIG_MACH_ASUS_2017
+			}
+			#endif
 			if (rc < 0) {
 				dev_err(&led->spmi_dev->dev, "Failed to " \
 					"configure pwm for new values\n");
@@ -1821,12 +1859,53 @@ static void qpnp_led_set(struct led_classdev *led_cdev,
 	if (value > led->cdev.max_brightness)
 		value = led->cdev.max_brightness;
 
+	#ifdef CONFIG_MACH_ASUS_2018
+	greenLedBlinking = 0;
+	#endif
+
 	led->cdev.brightness = value;
+	#ifdef CONFIG_MACH_ASUS_2017
+	led->cdev.blink_brightness = 0;
+	led->cdev.blink_delay_on = 0;
+	led->cdev.blink_delay_off = 0;
+	#endif
 	if (led->in_order_command_processing)
 		queue_work(led->workqueue, &led->work);
 	else
 		schedule_work(&led->work);
 }
+
+#ifdef CONFIG_MACH_ASUS_2017
+static int qpnp_mpp_blink_set(struct led_classdev *led_cdev,
+			    unsigned long *delay_on, unsigned long *delay_off)
+{
+	struct qpnp_led_data *led;
+
+	led = container_of(led_cdev, struct qpnp_led_data, cdev);
+
+	if((*delay_on!=led->cdev.blink_delay_on)||(*delay_off!=led->cdev.blink_delay_off)) {
+		if((*delay_on)&&(*delay_off)) {
+			
+			led->cdev.blink_brightness = led->cdev.max_brightness;
+			led->cdev.brightness = led->cdev.max_brightness;
+			if (led->in_order_command_processing)
+				queue_work(led->workqueue, &led->work);
+			else
+				schedule_work(&led->work);
+		} else {
+			led->cdev.blink_brightness = 0;
+			led->cdev.brightness = 0;
+			if (led->in_order_command_processing)
+				queue_work(led->workqueue, &led->work);
+			else
+				schedule_work(&led->work);
+		}
+	}
+	led->cdev.blink_delay_on = *delay_on;
+	led->cdev.blink_delay_off = *delay_off;
+	return 0;
+}
+#endif
 
 static void __qpnp_led_work(struct qpnp_led_data *led,
 				enum led_brightness value)
@@ -2664,6 +2743,21 @@ static void led_blink(struct qpnp_led_data *led,
 				"KPDBL set brightness failed (%d)\n", rc);
 		}
 	}
+	#ifdef CONFIG_MACH_ASUS_2018
+    else
+    {
+        if (led->id == QPNP_ID_LED_MPP) {
+            if(greenLedBlinking)
+           	    led->cdev.brightness = 51;
+            else
+                led->cdev.brightness = 0;
+        	if (led->in_order_command_processing)
+        		queue_work(led->workqueue, &led->work);
+        	else
+        		schedule_work(&led->work);
+        }
+    }
+	#endif
 	mutex_unlock(&led->lock);
 }
 
@@ -2677,6 +2771,9 @@ static ssize_t blink_store(struct device *dev,
 	ssize_t ret = -EINVAL;
 
 	ret = kstrtoul(buf, 10, &blinking);
+	#ifdef CONFIG_MACH_ASUS_2018
+	greenLedBlinking = blinking;
+	#endif
 	if (ret)
 		return ret;
 	led = container_of(led_cdev, struct qpnp_led_data, cdev);
@@ -2684,7 +2781,16 @@ static ssize_t blink_store(struct device *dev,
 
 	switch (led->id) {
 	case QPNP_ID_LED_MPP:
+		#ifdef CONFIG_MACH_ASUS_2017
+		if(led->mpp_cfg->pwm_cfg->pwm_use_blink) {
+			qpnp_mpp_blink_set(led_cdev,&led->mpp_cfg->pwm_cfg->pwm_blink_onms,
+				&led->mpp_cfg->pwm_cfg->pwm_blink_offms);
+		} else {
+		#endif
 		led_blink(led, led->mpp_cfg->pwm_cfg);
+		#ifdef CONFIG_MACH_ASUS_2017
+		}
+		#endif
 		break;
 	case QPNP_ID_RGB_RED:
 	case QPNP_ID_RGB_GREEN:
@@ -3572,6 +3678,27 @@ static int qpnp_get_config_pwm(struct pwm_config_data *pwm_cfg,
 			return rc;
 	}
 
+	#ifdef CONFIG_MACH_ASUS_2017
+	pwm_cfg->pwm_use_blink =
+		of_property_read_bool(node, "qcom,pwm-use-blink");
+	if(pwm_cfg->pwm_use_blink) {
+		pwm_cfg->pwm_blink_offms= 0;
+		rc = of_property_read_u32(node, "qcom,pwm-blink-offms", &val);
+		if (!rc)
+			pwm_cfg->pwm_blink_offms = val;
+		else if (rc != -EINVAL)
+			goto bad_lpg_params;
+
+		pwm_cfg->pwm_blink_onms= 0;
+		rc = of_property_read_u32(node, "qcom,pwm-blink-onms", &val);
+		if (!rc)
+			pwm_cfg->pwm_blink_onms = val;
+		else if (rc != -EINVAL)
+			goto bad_lpg_params;
+
+	}
+	#endif
+
 	pwm_cfg->use_blink =
 		of_property_read_bool(node, "qcom,use-blink");
 
@@ -3695,6 +3822,9 @@ static int qpnp_get_config_pwm(struct pwm_config_data *pwm_cfg,
 
 bad_lpg_params:
 	pwm_cfg->use_blink = false;
+	#ifdef CONFIG_MACH_ASUS_2017
+	pwm_cfg->pwm_use_blink = false;
+	#endif
 	if (pwm_cfg->mode == PWM_MODE) {
 		dev_err(&spmi_dev->dev, "LPG parameters not set for" \
 			" blink mode, defaulting to PWM mode\n");
@@ -4128,6 +4258,9 @@ static int qpnp_leds_probe(struct spmi_device *spmi)
 				goto fail_id_check;
 			}
 		} else if (strncmp(led_label, "mpp", sizeof("mpp")) == 0) {
+			#ifdef CONFIG_MACH_ASUS_2017
+			led->cdev.blink_set = qpnp_mpp_blink_set;
+			#endif
 			rc = qpnp_get_config_mpp(led, temp);
 			if (rc < 0) {
 				dev_err(&led->spmi_dev->dev,
@@ -4211,6 +4344,15 @@ static int qpnp_leds_probe(struct spmi_device *spmi)
 					&pwm_attr_group);
 				if (rc)
 					goto fail_id_check;
+				#ifdef CONFIG_MACH_ASUS_2018
+                if (!led->mpp_cfg->pwm_cfg->use_blink)
+                {
+                    rc = sysfs_create_group(&led->cdev.dev->kobj,
+    					&blink_attr_group);
+                    if (rc)
+    					goto fail_id_check;
+                }
+                #endif
 			}
 			if (led->mpp_cfg->pwm_cfg->use_blink) {
 				rc = sysfs_create_group(&led->cdev.dev->kobj,
@@ -4222,6 +4364,13 @@ static int qpnp_leds_probe(struct spmi_device *spmi)
 					&lpg_attr_group);
 				if (rc)
 					goto fail_id_check;
+			#ifdef CONFIG_MACH_ASUS_2017
+			} else if (led->mpp_cfg->pwm_cfg->pwm_use_blink) {
+				rc = sysfs_create_group(&led->cdev.dev->kobj,
+					&blink_attr_group);
+				if (rc)
+					goto fail_id_check;
+			#endif
 			} else if (led->mpp_cfg->pwm_cfg->mode == LPG_MODE) {
 				rc = sysfs_create_group(&led->cdev.dev->kobj,
 					&lpg_attr_group);
@@ -4345,8 +4494,17 @@ static int qpnp_leds_remove(struct spmi_device *spmi)
 		case QPNP_ID_RGB_GREEN:
 		case QPNP_ID_RGB_BLUE:
 			if (led_array[i].rgb_cfg->pwm_cfg->mode == PWM_MODE)
+			{
 				sysfs_remove_group(&led_array[i].cdev.dev->\
 					kobj, &pwm_attr_group);
+                #ifdef CONFIG_MACH_ASUS_2018
+                if (!led_array[i].rgb_cfg->pwm_cfg->use_blink)
+                {
+					sysfs_remove_group(&led_array[i].cdev.dev->\
+						kobj, &blink_attr_group);
+				}
+                #endif
+			}
 			if (led_array[i].rgb_cfg->pwm_cfg->use_blink) {
 				sysfs_remove_group(&led_array[i].cdev.dev->\
 					kobj, &blink_attr_group);
