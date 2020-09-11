@@ -38,6 +38,7 @@
 #include "diag_masks.h"
 #include "diag_usb.h"
 #include "diag_mux.h"
+#include "diag_wind.h"
 
 #define STM_CMD_VERSION_OFFSET	4
 #define STM_CMD_MASK_OFFSET	5
@@ -903,7 +904,9 @@ int diag_process_apps_pkt(unsigned char *buf, int len, int pid)
 	struct diag_cmd_reg_entry_t *temp_entry = NULL;
 	struct diag_cmd_reg_t *reg_item = NULL;
 	struct diag_md_session_t *info = NULL;
-
+	//liqiang@wind-mobi.com 20171013 add begin
+	int tx_len = 0;
+	int cmd = 0;
 	if (!buf || len <= 0)
 		return -EIO;
 
@@ -1069,6 +1072,19 @@ int diag_process_apps_pkt(unsigned char *buf, int len, int pid)
 		diag_send_rsp(driver->apps_rsp_buf, 6);
 		return 0;
 	}
+	//liqiang@wind-mobi.com 20171013 add begin
+	else if ( (cmd = wind_diag_cmd_handler(buf, len, driver->apps_rsp_buf, &tx_len) ) != -1) {
+                printk(KERN_CRIT "diag: begin!\n");           
+                diag_send_rsp(driver->apps_rsp_buf, tx_len);
+                printk(KERN_CRIT "diag:  end!\n");
+				
+				if(cmd == SMT_CMD_SLEEP){
+					printk(KERN_CRIT "sleep begin!\n"); 
+					//pm_autosleep_set_state(PM_SUSPEND_MEM);
+				}
+				
+                return 0;
+     }
 	/* Mobile ID Rsp */
 	else if ((len >= (4 * sizeof(uint8_t))) &&
 		(*buf == DIAG_CMD_DIAG_SUBSYS) &&
