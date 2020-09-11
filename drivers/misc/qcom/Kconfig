@@ -1,3 +1,7 @@
+#add by zhaozhensen@wind-mobi.com 20180110 begin
+source "drivers/misc/qcom/sim_int_default_set/Kconfig"
+#add by zhaozhensen@wind-mobi.com 20180110 end
+
 config MSM_QDSP6V2_CODECS
 	bool "Audio QDSP6V2 APR support"
 	depends on MSM_SMD || MSM_HAB
@@ -23,3 +27,11 @@ config MSM_MCU_TIME_SYNC
        help
          Say Y here if you want to get mcu and apq8009 data transfer
          with gpio.
+
+#liulinsheng@wind-mobi.com 20171023 begin
+config WIND_ASUS_USB_TEMP_CHECK
+	bool "WIND_ASUS config usb thermal code"
+	default n
+	help
+		need config usb thermal code
+#liulinsheng@wind-mobi.com 20171023 end
