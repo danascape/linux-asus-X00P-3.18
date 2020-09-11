@@ -55,7 +55,7 @@
 		};
 	};
 
-	hbtp {
+/*	hbtp {
 		compatible = "qcom,hbtp-input";
 		vcc_ana-supply = <&pm8917_l10>;
 		vcc_dig-supply = <&pm8917_l5>;
@@ -66,7 +66,7 @@
 		qcom,dig-vtg-min = <1800000>;
 		qcom,dig-vtg-max = <1800000>;
 	};
-
+*/
 	usb_detect {
 		compatible = "qcom,gpio-usbdetect";
 		interrupt-names = "vbus_det_irq";

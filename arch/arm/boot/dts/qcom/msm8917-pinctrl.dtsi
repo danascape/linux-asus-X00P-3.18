@@ -22,6 +22,67 @@
 		#interrupt-cells = <2>;
 
 #include "msm8917-camera-pinctrl.dtsi"
+//hebiao@wind-mobi.com 20170824 begin
+		ctp_eint_as_int {
+				eint_as_int: eint_as_int {
+					mux {
+						pins = "gpio65";
+						function = "gpio";
+					};
+					config {
+					pins = "gpio65";
+					drive-strength = <8>;
+					input-enable; 
+					bias-disable;
+					};
+			};
+		};
+		
+		ctp_eint_output_low {
+			eint_output_low: eint_output_low {
+				mux {
+					pins = "gpio65";
+					function = "gpio";
+				};
+				config {
+					pins = "gpio65";
+					drive-strength = <8>;
+					bias-pull-down;
+					output-low;
+				};
+			};
+		};
+	
+		ctp_eint_output_high {
+			eint_output_high: eint_output_high {
+				mux {
+					pins = "gpio65";
+					function = "gpio";
+				};
+				config {
+					pins = "gpio65";
+					drive-strength = <8>;
+					bias-pull-up;
+					output-high;
+				};
+			};
+		};
+		
+		sensor_mag_output_high {
+			mag_output_high: mag_output_high {
+				mux {
+					pins = "gpio44";
+					function = "gpio";
+				};
+				config {
+					pins = "gpio44";
+					drive-strength = <8>;
+					bias-pull-up;
+					output-high;
+				};
+			};
+		};
+//hebiao@wind-mobi.com 20170824 end			
 
 		/* add pingrp for touchscreen */
 		pmx_ts_int_active {
@@ -112,7 +173,31 @@
 					bias-disable;
 				};
 			};
+		//add by zhaozhensen@wind-mobi.com 20180110 begin	
+		sim1_eint_default: sim1_eint_default {
+			muex {
+				pins = "gpio54";
+				function = "gpio";
+			};
+			config {
+				pins = "gpio54";
+				drive-strength = <8>;
+				bias-disable;
+			};
+		};
 
+		sim2_eint_default: sim2_eint_default {
+			muex {
+				pins = "gpio58";
+				function = "gpio";
+			};
+			config {
+				pins = "gpio58";
+				drive-strength = <8>;
+				bias-disable;
+			};
+		};
+		//add by zhaozhensen@wind-mobi.com 20180110 end
 			uart_console_sleep: uart_console_sleep {
 				mux {
 					pins = "gpio4", "gpio5";
@@ -1400,15 +1485,15 @@
 					output-low;
 				};
 			};
-
+//zhenglihong@wind-mobi.com 201710117 begin
 			front_flash_led_enable: front_flash_led_enable {
 				mux {
-					pins = "gpio50";
+					//pins = "gpio50";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio50";
+					//pins = "gpio50";
 					drive-strength = <16>;
 					output-high;
 				};
@@ -1416,17 +1501,33 @@
 
 			front_flash_led_disable: front_flash_led_disable {
 				mux {
-					pins = "gpio50";
+					//pins = "gpio50";
 					function = "gpio";
 				};
 
 				config {
-					pins = "gpio50";
+					//pins = "gpio50";
 					drive-strength = <2>;
 					output-low;
 				};
 			};
 		};
+
+		//liulinsheng@wind-mobi.com 20171023 begin
+		usbtem_int_default: usbtem_int_default {
+			mux {
+				pins = "gpio124";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio124";
+				drive-strength = <16>;
+				bias-pull-up;
+				input-enable;
+			};
+		};
+		//liulinsheng@wind-mobi.com 20171023 end
 
 		usbc_int_default: usbc_int_default {
 			mux {
@@ -1440,7 +1541,7 @@
 				bias-pull-up;
 			};
 		};
-
+//zhenglihong@wind-mobi.com 201710117 end
 		pri_mi2s_sck {
 			pri_mi2s_sck_sleep: pri_mi2s_sck_sleep {
 				mux {

@@ -85,13 +85,13 @@
 		};
 	};
 
-	hbtp {
+/*	hbtp {
 		compatible = "qcom,hbtp-input";
 		vcc_dig-supply = <&pm8937_l5>;
 		qcom,dig-load = <15000>;
 		qcom,dig-vtg-min = <1800000>;
 		qcom,dig-vtg-max = <1800000>;
-	};
+	};*/
 };
 
 &tlmm {

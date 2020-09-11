@@ -102,7 +102,7 @@
 			debounce-interval = <15>;
 		};
 	};
-
+/*
 	hbtp {
 		compatible = "qcom,hbtp-input";
 		vcc_ana-supply = <&pm8953_l10>;
@@ -113,7 +113,7 @@
 		qcom,dig-load = <15000>;
 		qcom,dig-vtg-min = <1800000>;
 		qcom,dig-vtg-max = <1800000>;
-	};
+	};*/
 };
 
 &tlmm {
