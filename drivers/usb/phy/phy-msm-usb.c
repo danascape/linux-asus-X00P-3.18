@@ -49,11 +49,18 @@
 
 #include <linux/msm-bus.h>
 
+bool g_otg_status = 1;   //motg->id_state = 0 -> cable in
+#include <linux/switch.h>
+static struct switch_dev otg_switch_data;
+
 #define MSM_USB_BASE	(motg->regs)
 #define MSM_USB_PHY_CSR_BASE (motg->phy_csr_regs)
 
 #define DRIVER_NAME	"msm_otg"
-
+#undef dev_dbg
+#define dev_dbg dev_info
+#undef pr_debug
+#define pr_debug pr_info
 #define CHG_RECHECK_DELAY	(jiffies + msecs_to_jiffies(2000))
 #define ULPI_IO_TIMEOUT_USEC	(10 * 1000)
 #define USB_PHY_3P3_VOL_MIN	3050000 /* uV */
@@ -459,7 +466,16 @@ static void ulpi_init(struct msm_otg *motg)
 		get_options(override_phy_init, ARRAY_SIZE(aseq), aseq);
 		seq = &aseq[1];
 	} else {
-		seq = pdata->phy_init_seq;
+		//zhangkaiyuan@wind-mobi.com 20180119 begin
+		//seq = pdata->phy_init_seq;
+		if (test_bit(ID, &motg->inputs)) {
+		    seq = pdata->phy_init_seq;
+		    //printk("use device mode init seq\n");
+		} else {
+		    seq = pdata->phy_host_init_seq;
+		    //printk("use host mode init seq\n");
+		}
+		//zhangkaiyuan@wind-mobi.com 20180119 end
 	}
 
 	if (!seq)
@@ -476,6 +492,7 @@ static void ulpi_init(struct msm_otg *motg)
 		ulpi_write(&motg->phy, seq[0], seq[1]);
 		seq += 2;
 	}
+	printk("wind---read ulpi_init:susb reg 0x81: 0x%x\n", ulpi_read(&motg->phy, 0x81)); //zhangkaiyuan@wind-mobi.com 20180119
 }
 
 static int msm_otg_phy_clk_reset(struct msm_otg *motg)
@@ -669,7 +686,16 @@ static void msm_usb_phy_reset(struct msm_otg *motg)
 				motg->phy_csr_regs + QUSB2PHY_PORT_UTMI_CTRL2);
 
 		/* Program tuning parameters for PHY */
-		seq = motg->pdata->phy_init_seq;
+		//zhangkaiyuan@wind-mobi.com 20180119 begin
+		//seq = motg->pdata->phy_init_seq;
+		if (test_bit(ID, &motg->inputs)) {
+			seq = motg->pdata->phy_init_seq;
+			//printk("use device mode init seq\n");
+		} else {
+			seq = motg->pdata->phy_host_init_seq;
+			//printk("use host mode init seq\n");
+		}
+		//zhangkaiyuan@wind-mobi.com 20180119 end
 		if (seq) {
 			while (seq[0] >= 0) {
 				writel_relaxed(seq[1],
@@ -677,7 +703,7 @@ static void msm_usb_phy_reset(struct msm_otg *motg)
 				seq += 2;
 			}
 		}
-
+		printk("wind---msm_usb_phy_reset ulpi:susb reg 0x81: 0x%x\n", ulpi_read(&motg->phy, 0x81)); //zhangkaiyuan@wind-mobi.com 20180119
 		/* ensure above writes are completed before re-enabling PHY */
 		wmb();
 		writel_relaxed(0x22,
@@ -3161,6 +3187,11 @@ static void msm_id_status_w(struct work_struct *w)
 		return;
 
 	if (motg->id_state) {
+		//modified by lvwenkang@wind-mobi.com for otg_id check 20180607 b-- 
+  		g_otg_status = 1;
+		switch_set_state(&otg_switch_data, 0);
+		pr_info("wind otg out ,%s,g_otg_status = %d\n",__func__,g_otg_status);
+ 		//modified by lvwenkang@wind-mobi.com for otg_id check 20180607 e-- 
 		if (gpio_is_valid(motg->pdata->switch_sel_gpio))
 			gpio_direction_input(motg->pdata->switch_sel_gpio);
 		if (!test_and_set_bit(ID, &motg->inputs)) {
@@ -3170,6 +3201,11 @@ static void msm_id_status_w(struct work_struct *w)
 			work = 1;
 		}
 	} else {
+		//modified by lvwenkang@wind-mobi.com for otg_id check 20180607 b-- 
+  		g_otg_status = 0;
+		switch_set_state(&otg_switch_data, 1);
+		pr_info("wind otg in ,%s,g_otg_status = %d\n",__func__,g_otg_status);
+ 		//modified by lvwenkang@wind-mobi.com for otg_id check 20180607 e-- 
 		if (gpio_is_valid(motg->pdata->switch_sel_gpio))
 			gpio_direction_output(motg->pdata->switch_sel_gpio, 1);
 		if (test_and_clear_bit(ID, &motg->inputs)) {
@@ -4263,6 +4299,20 @@ struct msm_otg_platform_data *msm_otg_dt_to_pdata(struct platform_device *pdev)
 				pdata->phy_init_seq,
 				len/sizeof(*pdata->phy_init_seq));
 	}
+
+	//zhangkaiyuan@wind-mobi.com 20180119 begin
+	of_get_property(node, "qcom,hsusb-otg-phy-host-init-seq", &len);
+	if (len) {
+		pdata->phy_host_init_seq = devm_kzalloc(&pdev->dev, len, GFP_KERNEL);
+		if (!pdata->phy_host_init_seq)
+		    return NULL;
+		of_property_read_u32_array(node, "qcom,hsusb-otg-phy-host-init-seq",
+		pdata->phy_host_init_seq,
+		len/sizeof(*pdata->phy_host_init_seq));
+		//printk("wind-otg: get hsusb-otg-phy-host-init-seq ok\n!");
+	}
+	//zhangkaiyuan@wind-mobi.com 20180119 end
+
 	of_property_read_u32(node, "qcom,hsusb-otg-power-budget",
 				&pdata->power_budget);
 	of_property_read_u32(node, "qcom,hsusb-otg-mode",
@@ -5035,6 +5085,13 @@ static int msm_otg_probe(struct platform_device *pdev)
 	motg->pm_notify.notifier_call = msm_otg_pm_notify;
 	register_pm_notifier(&motg->pm_notify);
 	msm_otg_dbg_log_event(phy, "OTG PROBE", motg->caps, motg->lpm_flags);
+
+//modified by lvwenkang@wind-mobi.com for otg_id check 20180607 b--
+	otg_switch_data.name  = "otg_connector";
+	otg_switch_data.index = 0;
+	otg_switch_data.state = 0;  /* original 60 frames */
+	switch_dev_register(&otg_switch_data);
+//modified by lvwenkang@wind-mobi.com for otg_id check 20180607 e--
 
 	return 0;
 

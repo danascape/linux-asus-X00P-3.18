@@ -22,6 +22,10 @@
 #include <linux/usb/composite.h>
 #include <linux/usb/msm_hsusb.h>
 #include <asm/unaligned.h>
+#undef dev_dbg
+#define dev_dbg dev_info
+#undef pr_debug
+#define pr_debug pr_info
 
 #include "u_os_desc.h"
 #define SSUSB_GADGET_VBUS_DRAW 900 /* in mA */

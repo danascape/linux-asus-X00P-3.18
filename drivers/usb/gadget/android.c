@@ -75,6 +75,8 @@
 #include "f_mass_storage.h"
 #include "f_ipc.h"
 
+
+
 USB_ETHERNET_MODULE_PARAMETERS();
 #ifdef CONFIG_MEDIA_SUPPORT
 USB_VIDEO_MODULE_PARAMETERS();
@@ -91,6 +93,11 @@ static const char longname[] = "Gadget Android";
 /* Default vendor and product IDs, overridden by userspace */
 #define VENDOR_ID		0x18D1
 #define PRODUCT_ID		0x0001
+
+#undef dev_dbg
+#define dev_dbg dev_info
+#undef pr_debug
+#define pr_debug pr_info
 
 #define ANDROID_DEVICE_NODE_NAME_LENGTH 11
 /* f_midi configuration */
