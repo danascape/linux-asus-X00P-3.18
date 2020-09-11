@@ -34,6 +34,13 @@
 #include <linux/regulator/consumer.h>
 #define DRV_NAME "msm8952-asoc-wcd"
 
+#if 0
+#undef dev_dbg
+#define dev_dbg dev_err
+#undef pr_debug
+#define pr_debug pr_err
+#endif
+
 #define BTSCO_RATE_8KHZ 8000
 #define BTSCO_RATE_16KHZ 16000
 
@@ -97,7 +104,7 @@ static struct wcd_mbhc_config mbhc_cfg = {
 	.swap_gnd_mic = NULL,
 	.hs_ext_micbias = false,
 	.key_code[0] = KEY_MEDIA,
-	.key_code[1] = KEY_VOICECOMMAND,
+	.key_code[1] = KEY_VOLUMEUP,  //KEY_VOICECOMMAND modified by guxuewei@wind-mobi.com 20180112
 	.key_code[2] = KEY_VOLUMEUP,
 	.key_code[3] = KEY_VOLUMEDOWN,
 	.key_code[4] = 0,
@@ -1608,7 +1615,9 @@ static void *def_msm8952_wcd_mbhc_cal(void)
 		return NULL;
 
 #define S(X, Y) ((WCD_MBHC_CAL_PLUG_TYPE_PTR(msm8952_wcd_cal)->X) = (Y))
-	S(v_hs_max, 1500);
+    // wangjun@wind-mob.com 20180131 begin
+	S(v_hs_max, 1700);
+    // wangjun@wind-mob.com 20180131 end
 #undef S
 #define S(X, Y) ((WCD_MBHC_CAL_BTN_DET_PTR(msm8952_wcd_cal)->X) = (Y))
 	S(num_btn, WCD_MBHC_DEF_BUTTONS);

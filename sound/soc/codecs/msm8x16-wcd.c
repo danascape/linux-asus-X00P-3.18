@@ -87,6 +87,13 @@
 #define EAR_PA_DISABLE (0x01 << 3)
 #define SPKR_PA_DISABLE (0x01 << 4)
 
+#if 0
+#undef dev_dbg
+#define dev_dbg dev_err
+#undef pr_debug
+#define pr_debug pr_err
+#endif
+
 enum {
 	BOOST_SWITCH = 0,
 	BOOST_ALWAYS,
