@@ -433,6 +433,11 @@ struct mmc_card {
 	u8 *cached_ext_csd;
 	bool cmdq_init;
 	struct mmc_bkops_info bkops;
+	
+// wangbing@wind-mobi.com 20180324 begin >>> [5/6] add the mmc total size debug node
+	unsigned int mmc_total_size;
+// wangbing@wind-mobi.com 20180324 end   <<< [5/6] add the mmc total size debug node
+	
 };
 
 /*
