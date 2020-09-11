@@ -39,6 +39,14 @@
 #include <linux/msm_bcl.h>
 #include <linux/ktime.h>
 #include <linux/pmic-voter.h>
+#include <linux/wakelock.h>
+
+#define CONFIG_USBIN_VADC
+#define CONFIG_OTG_CTL_INPUT_KEY
+#define CONFIG_COUNTRY_CODE
+#define CONFIG_ASUS_ADAPTER_ID
+#define JEITA_CHARGING_POLLING_WORK
+
 
 /* Mask/Bit helpers */
 #define _SMB_MASK(BITS, POS) \
@@ -207,6 +215,9 @@ struct smbchg_chip {
 	bool				batt_cold;
 	bool				batt_warm;
 	bool				batt_cool;
+	bool				batt_overvoltage;                //liulinsheng@wind-mobi.com 20171206
+	bool				batt_cold_new;                   //liulinsheng@wind-mobi.com 20171211
+	bool 				batt_hot_new;                    //liulinsheng@wind-mobi.com 20171211
 	unsigned int			thermal_levels;
 	unsigned int			therm_lvl_sel;
 	unsigned int			*thermal_mitigation;
@@ -417,7 +428,604 @@ enum wake_reason {
 #define	HVDCP_OTG_VOTER			"HVDCP_OTG_VOTER"
 #define	HVDCP_PULSING_VOTER		"HVDCP_PULSING_VOTER"
 
-static int smbchg_debug_mask;
+
+/**************************************************/
+struct smbchg_chip *chip_for_fg;
+bool usb_present = 0;
+int usb_to_demoapp_flag = 0;
+extern int g_usb_temp_check_state;
+
+extern struct thermal_zone_device *pcb_tz_asus;
+extern int asus_thermal_get_temp(struct thermal_zone_device *thermal);
+
+#ifdef CONFIG_WIND_ASUS_BATTERY_LIFE_SUPPORT
+extern bool bat_full_batlife;
+extern int batlife_stop_flag;
+extern int demo_bat_stop_flag;
+extern int demoapp_suspend_charger_flag;
+#endif	//CONFIG_WIND_ASUS_BATTERY_LIFE_SUPPORT
+
+static inline void dump_reg(struct smbchg_chip *chip, u16 addr,const char *name);
+static void dump_regs_less(struct smbchg_chip *chip);
+
+#ifdef CONFIG_USBIN_VADC
+struct qpnp_vadc_chip *usbin_vadc_dev;
+int qpnp_vadc_flag = 0;
+
+int get_vbus_voltage(void) {
+    int ret_val = 0;
+    struct qpnp_vadc_result result;
+
+    qpnp_vadc_read(usbin_vadc_dev, USBIN, &result);
+    ret_val = ((int)result.physical);
+
+    pr_err("wangs: %s wind-usbin-test: %d\n", __func__, ret_val);
+    return ret_val;
+}
+#endif
+
+#ifdef CONFIG_OTG_CTL_INPUT_KEY
+#include <linux/input.h>
+static struct input_dev *otg_ctl_input = NULL;
+#define OTG_CABLE_IN   KEY_FN_F9
+#define OTG_CABLE_OUT  KEY_FN_F10
+
+static void otg_ctl_init_input(void)
+{
+    int ret = 0;
+    pr_info("[wind:] otg_ctl_init_input enter...\n");
+    otg_ctl_input = input_allocate_device();
+    if (! otg_ctl_input) {
+        pr_err("[wind:] otg_ctl_input allocate device failed.\n");
+        return;
+    }
+
+    __set_bit(EV_KEY, otg_ctl_input->evbit);
+    __set_bit(EV_ABS, otg_ctl_input->evbit);
+    __set_bit(EV_SYN, otg_ctl_input->evbit);
+    input_set_capability(otg_ctl_input, EV_KEY, OTG_CABLE_IN);
+    input_set_capability(otg_ctl_input, EV_KEY, OTG_CABLE_OUT);
+    __set_bit(OTG_CABLE_IN, otg_ctl_input->evbit);
+    __set_bit(OTG_CABLE_OUT, otg_ctl_input->evbit);
+
+    otg_ctl_input->name = "otg_ctl_key";
+    ret = input_register_device(otg_ctl_input);
+    if (ret) {
+        printk("[wind:]otg_ctl_input register device failed.\n");
+        input_free_device(otg_ctl_input);
+    }
+    pr_info("[wind:]otg_ctl_init_input leave...\n");
+}
+#endif	//CONFIG_OTG_CTL_INPUT_KEY
+
+#ifdef CONFIG_COUNTRY_CODE
+static char  country_code[32];
+static int   br_flag = 0;
+
+static int __init country_code_param(char *line) {
+    strlcpy(country_code, line, sizeof(country_code));
+    if((!strcmp(country_code ,"BR")) || (!strcmp(country_code ,"br"))){
+        br_flag = 1;
+    }
+    printk("wind_brazil country_code = %s br_flag = %d \n",country_code, br_flag);
+    return 0;
+}
+__setup("androidboot.country_code=", country_code_param);
+#endif	//CONFIG_COUNTRY_CODE
+
+#ifdef CONFIG_ASUS_ADAPTER_ID
+static int current_set_global = 0;
+static int current_set_global_bak = 0;
+
+static int adapter_id_dcp_flag = 0;
+static struct wake_lock adapter_id_wake_lock;
+
+static int smbchg_set_high_usb_chg_current(struct smbchg_chip *chip, int current_ma);
+
+/* *** GPIO setting start *** */
+#define GPIO_USB_SWITCH_EN		8
+#define GPIO_ADAPTER_ID_EN		68
+
+struct device_node *np;	//DTS
+static struct work_struct work_adapter_id;	//WORK
+
+int adapter_id_gpio_hw_setting(void) {
+    int err = 0;
+
+    //GPIO_USB_SWITCH_EN
+    if (gpio_is_valid(GPIO_USB_SWITCH_EN)){
+        err = gpio_request(GPIO_USB_SWITCH_EN, "usb_switch_en");  //GPIO 8
+        if (err) {
+            pr_err("[adapter_id]: Couldn't request usb_switch_en\n");
+            return err;
+        } else
+            pr_info("[adapter_id]: request usb_switch_en success\n");
+        msleep(200);
+        gpio_direction_output(GPIO_USB_SWITCH_EN, 0);
+        msleep(10);
+    }
+
+    //GPIO_ADAPTER_ID_EN
+    if (gpio_is_valid(GPIO_ADAPTER_ID_EN)){
+        err = gpio_request(GPIO_ADAPTER_ID_EN, "adapter_id_en");  //GPIO 68
+        if (err) {
+            pr_err("[adapter_id]: Couldn't request adapter_id_en\n");
+            return err;
+        } else
+            pr_info("[adapter_id]: request adapter_id_en success\n");
+        msleep(100);
+        gpio_direction_output(GPIO_ADAPTER_ID_EN, 0);
+        msleep(20);
+    }
+
+    pr_info("[wind_adapter_id]#1, usb_switch_gpio=%d ,adapter_id_en=%d \n", gpio_get_value(GPIO_USB_SWITCH_EN), gpio_get_value(GPIO_ADAPTER_ID_EN) );
+    return err;
+}
+
+// *** ADC get value start *** /
+int chg_id_volt_1 = 0;
+int chg_id_volt_2 = 0;
+
+#define CURRENT_2000_MA		2000
+#define CURRENT_1000_MA		1000
+//renyongwei@wind-mobi.com 20180123 begin
+#define CURRENT_950_MA		950
+#define CURRENT_700_MA		700
+//renyongwei@wind-mobi.com 20180123 end
+
+//renyongwei@wind-mobi.com 20180329 begin
+#define CURRENT_1880_MA		1880
+//renyongwei@wind-mobi.com 20180329 end
+
+#define FILTER_THRESHOLD    2000   //2mv
+#define FILTER_TIMES    	5
+
+#define ADAPTER_ID_FIRST_STAGE_RADC 		1
+#define ADAPTER_ID_SECOND_STAGE_RADC 		2
+#define ADAPTER_ID_THIRD_STAGE_CAL          3
+#define ADAPTER_ID_FOURTH_STAGE_SET_CUR 	4
+
+struct qpnp_vadc_chip		*mpp1_vadc_dev;
+
+int get_mpp1_voltage(void) {
+
+    int i, ret_val = 0;
+    int count = 0;
+    int ret_val_tmp[FILTER_TIMES];
+    int err = 0;
+    struct qpnp_vadc_result result;
+
+    for( i = 0; i < FILTER_TIMES; i++ ) {
+        err = qpnp_vadc_read(mpp1_vadc_dev, P_MUX1_1_1, &result);  //P_MUX1_1_1
+        if( err != 0) {
+            printk("[wind_adapter_id] get mpp1 adc value fail ! \n");
+        }
+        ret_val = ((int)result.physical);  // / 1000;   // uV to mV
+        printk("[wind_adapter_id] get mpp1 adc value[%d]=%d !\n", i, ret_val);
+
+        // save in the array
+        ret_val_tmp[i] = ret_val;
+
+        //start checking if the data is not ideal
+        if( i > 1 ){
+            if( FILTER_THRESHOLD < ( ( ret_val_tmp[i] >= ret_val_tmp[i-1] ) ? (ret_val_tmp[i] - ret_val_tmp[i-1]) : (ret_val_tmp[i-1] - ret_val_tmp[i]) ) )
+            {
+                ret_val_tmp[0] = ret_val_tmp[i];
+                i = 0;
+                count++;
+                printk("[wind_adapter_id] reset i = 0!\n");
+            }
+        }
+        // if get adc value timeout ,the default result is 3000uV (3mV) and warning
+        if( count >= 50){
+            printk("[wind_adapter_id] warning!!! ************************************ !!!\n");
+            printk("[wind_adapter_id] warning!!! this board is not support adapter id !!!\n");
+            printk("[wind_adapter_id] warning!!! ************************************ !!!\n");
+            ret_val = 3000;
+            break;
+        }
+        msleep(5);
+    }
+    count = 0;
+    return ret_val;
+}
+
+static void adapter_id_main(struct work_struct *work)
+{
+    int current_tmp = 500;
+    int current_limit = 0x4;		//500mA
+    int type = ADAPTER_ID_FIRST_STAGE_RADC;
+    int i = 0;
+
+    pr_info("[wind_adapter_id] start to lock adapter_id_wake_lock !!! \n");
+    wake_lock(&adapter_id_wake_lock);
+
+    current_set_global = current_limit;
+    //renyongwei@wind-mobi.com 20180123 begin
+    current_set_global_bak = current_set_global;
+    //renyongwei@wind-mobi.com 20180123 end
+
+
+    //printk("[wind_adapter_id][%s] enter ,start sleep 20s\n",__func__);
+    if ( ( smbchg_set_high_usb_chg_current(chip_for_fg, current_tmp) ) < 0)
+        pr_info("[wind_adapter_id] ADAPTER_ID_FOURTH_STAGE_SET_CUR,Couldn't set current_tmp = %d mA, current_limit=0x%x    ERROR!!!\n",current_tmp, current_limit);
+    else
+        pr_info("[wind_adapter_id] ADAPTER_ID_FOURTH_STAGE_SET_CUR,set current_tmp = %d mA, current_limit=0x%x ,successful\n",current_tmp, current_limit);
+
+    if ( type == ADAPTER_ID_FIRST_STAGE_RADC )     //0
+    {
+        //ASUS_2_0A_PB_CHARGER
+        gpio_direction_output(GPIO_USB_SWITCH_EN, 1);
+        //msleep(200);
+        //msleep(15000);  //PB should sleep 15s
+
+        i = 15;
+        while(i){
+            msleep(1000);
+            //mdelay(200);
+            if( (chip_for_fg->usb_supply_type != POWER_SUPPLY_TYPE_USB_DCP) || adapter_id_dcp_flag == 0){
+                adapter_id_dcp_flag = 0;
+                break;
+            }
+            pr_info("[wind_adapter_id]sleep(%d ms), usb_supply_type=%d , adapter_id_dcp_flag=%d \n", (75-i)*200, chip_for_fg->usb_supply_type, adapter_id_dcp_flag );
+            i--;
+        }
+
+        pr_info("[wind_adapter_id]#2, usb_switch_gpio=%d ,adapter_id_en=%d\n", gpio_get_value(GPIO_USB_SWITCH_EN), gpio_get_value(GPIO_ADAPTER_ID_EN));
+
+        if(adapter_id_dcp_flag == 0){
+            gpio_direction_output(GPIO_USB_SWITCH_EN, 0);
+            msleep(200);
+            pr_info("[wind_adapter_id] warnning!!!  usb is out, usb_switch_gpio=%d ,adapter_id_en=%d\n", gpio_get_value(GPIO_USB_SWITCH_EN), gpio_get_value(GPIO_ADAPTER_ID_EN));
+            wake_unlock(&adapter_id_wake_lock);
+            pr_info("[wind_adapter_id] done! have unlock adapter_id_wake_lock !!! \n");
+            return;
+        }
+
+        chg_id_volt_1 = get_mpp1_voltage();
+        type = ADAPTER_ID_SECOND_STAGE_RADC;
+        pr_info("[wind_adapter_id] ADAPTER_ID_FIRST_STAGE_RADC done, chg_id_volt_1=%d \n",chg_id_volt_1);
+
+        //if( chg_id_volt_1 >= 300000 ){
+        //	printk("[wind_adapter_id] PowerBank, will sleep 15s, then do second read, chg_id_volt_1=%d \n", chg_id_volt_1);
+        //	msleep(15000);  //PB should sleep 15s
+        //	chg_id_volt_1 = get_mpp1_voltage();
+        if( chg_id_volt_1>=1000000 && chg_id_volt_1<=1450000 )
+        {
+            //current_tmp = CURRENT_2000_MA;
+            //current_limit = 0x19;
+            //renyongwei@wind-mobi.com 20180329 begin
+            current_tmp = CURRENT_1880_MA;
+            current_limit = 0x14;
+            //renyongwei@wind-mobi.com 20180329 end
+            type = ADAPTER_ID_FOURTH_STAGE_SET_CUR;
+            pr_info("[wind_adapter_id] PowerBank, second read done, chg_id_volt_1=%d , current_tmp=%d , current_limit=0x%x\n",chg_id_volt_1, current_tmp, current_limit);
+        }
+        //}
+    }
+
+    if( type == ADAPTER_ID_SECOND_STAGE_RADC )   //1
+    {
+        //ASUS_2_0A_18W_CHARGER,ASUS_2_0A_10W_CHARGER,ASUS_1_0A_5W_CHARGER,OTHER_AC_CHARGER
+        gpio_direction_output(GPIO_USB_SWITCH_EN, 1);
+        gpio_direction_output(GPIO_ADAPTER_ID_EN, 1);
+        msleep(200);
+        pr_info("[wind_adapter_id]#3,usb_switch_gpio=%d , adapter_id_en=%d \n",gpio_get_value(GPIO_USB_SWITCH_EN),gpio_get_value(GPIO_ADAPTER_ID_EN) );
+
+        chg_id_volt_2 = get_mpp1_voltage();
+        type = ADAPTER_ID_THIRD_STAGE_CAL;
+        pr_info("[wind_adapter_id] ADAPTER_ID_SECOND_STAGE_RADC done, chg_id_volt_2=%d \n",chg_id_volt_2);
+    }
+
+    if( type == ADAPTER_ID_THIRD_STAGE_CAL )    //2
+    {
+        // Brazil
+        if( (chg_id_volt_1<=60000  &&  chg_id_volt_2>=2000000) ){
+            //current_tmp = CURRENT_2000_MA;
+            //current_limit = 0x19;
+            //renyongwei@wind-mobi.com 20180329 begin
+            current_tmp = CURRENT_1880_MA;
+            current_limit = 0x14;
+            //renyongwei@wind-mobi.com 20180329 end
+        }
+        // 18W ==> volt1 <0.06v   volt2   0.2v - 0.45v
+        else if( chg_id_volt_1<=60000 && chg_id_volt_2>=200000 && chg_id_volt_2<=450000 ){
+            //current_tmp = CURRENT_2000_MA;
+            //current_limit = 0x19;
+            //renyongwei@wind-mobi.com 20180329 begin
+            current_tmp = CURRENT_1880_MA;
+            current_limit = 0x14;
+            //renyongwei@wind-mobi.com 20180329 end
+        }
+        // 10w  ==>  volt1 <0.06v   volt2  0.6v - 0.85v
+        else if( chg_id_volt_1<=60000 && chg_id_volt_2>=600000 && chg_id_volt_2<=850000 ){
+            //current_tmp = CURRENT_2000_MA;
+            //current_limit = 0x19;
+            //renyongwei@wind-mobi.com 20180329 begin
+            current_tmp = CURRENT_1880_MA;
+            current_limit = 0x14;
+            //renyongwei@wind-mobi.com 20180329 end
+        }
+        // 5w ==> volt2  volt1 <0.06v   volt2  1v - 1.45v
+        //luguosheng@wind-mobi.com 20180308 for brazil adapter +++
+        else if( (chg_id_volt_1<=60000&&chg_id_volt_2>=1000000&&chg_id_volt_2<=1450000) ){
+            if(br_flag == 1)
+            {
+                //current_tmp = CURRENT_2000_MA;
+                //current_limit = 0x19;
+                //renyongwei@wind-mobi.com 20180329 begin
+                current_tmp = CURRENT_1880_MA;
+                current_limit = 0x14;
+                //renyongwei@wind-mobi.com 20180329 end
+                pr_info("wind-lgs charging is 5W2A BR \n");
+            }
+            else
+            {
+                current_tmp = CURRENT_1000_MA;
+                current_limit = 0xA;
+                pr_info("wind-lgs charging is 5W1A not BR \n");
+            }
+        }
+        //luguosheng@wind-mobi.com 20180308 for brazil adapter ---
+        // 2A PB ==> volt1 1v  - 1.45v   volt2 1v - 1.45v
+        //else if( chg_id_volt_1>=1000000 && chg_id_volt_1<=1450000 && chg_id_volt_2>=1000000 && chg_id_volt_2<=1450000 )	
+        else if( chg_id_volt_1>=1000000 && chg_id_volt_1<=1450000 ) {
+            //current_tmp = CURRENT_2000_MA;
+            //current_limit = 0x19;
+            //renyongwei@wind-mobi.com 20180329 begin
+            current_tmp = CURRENT_1880_MA;
+            current_limit = 0x14;
+            //renyongwei@wind-mobi.com 20180329 end
+        } else {
+            current_tmp = CURRENT_1000_MA;
+            current_limit = 0xA;                 //modified by liulinsheng
+        }
+        type = ADAPTER_ID_FOURTH_STAGE_SET_CUR;
+        pr_info("[wind_adapter_id] ADAPTER_ID_THIRD_STAGE_CAL, chg_id_volt_1=%d, chg_id_volt_2=%d, current_tmp=%d , current_limit=0x%x!\n", chg_id_volt_1, chg_id_volt_2,current_tmp ,current_limit);
+    }
+
+    //start to set current
+    if( type == ADAPTER_ID_FOURTH_STAGE_SET_CUR ) 
+    {
+        gpio_direction_output(GPIO_USB_SWITCH_EN, 0);
+        gpio_direction_output(GPIO_ADAPTER_ID_EN, 0);
+        msleep(200);
+        pr_info("[wind_adapter_id]#4,usb_switch_gpio=%d , adapter_id_en=%d \n",gpio_get_value(GPIO_USB_SWITCH_EN),gpio_get_value(GPIO_ADAPTER_ID_EN) );
+
+        current_set_global = current_limit;
+        //renyongwei@wind-mobi.com 20180123 begin
+        current_set_global_bak = current_set_global;
+        //renyongwei@wind-mobi.com 20180123 end
+
+        //if ( ( smbchg_sec_masked_write(chip_for_fg, chip_for_fg->usb_chgpth_base + IL_CFG, USBIN_INPUT_MASK, current_limit) ) < 0)
+        if ( (adapter_id_dcp_flag != 0 ) && (( smbchg_set_high_usb_chg_current(chip_for_fg, current_tmp) ) < 0) )	
+            pr_info("[wind_adapter_id] ADAPTER_ID_FOURTH_STAGE_SET_CUR,Couldn't set current_tmp = %d mA, current_limit=0x%x    ERROR!!!\n",current_tmp, current_limit);
+        else
+            pr_info("[wind_adapter_id] ADAPTER_ID_FOURTH_STAGE_SET_CUR,set current_tmp = %d mA, current_limit=0x%x ,successful\n",current_tmp, current_limit);
+    }
+
+    wake_unlock(&adapter_id_wake_lock);
+    pr_info("[wind_adapter_id]done! have unlock adapter_id_wake_lock !!! \n");
+}
+#endif //CONFIG_ASUS_ADAPTER_ID
+
+#ifdef JEITA_CHARGING_POLLING_WORK
+extern int power_off_charger;
+extern void kernel_restart(char *cmd);
+
+struct delayed_work jeita_charging_polling_work;
+
+int disable_otg_usbthermal(void);
+int smbchg_usb_suspend(struct smbchg_chip *chip, bool suspend);
+static int get_prop_batt_voltage_now(struct smbchg_chip *chip);
+static int get_prop_batt_temp(struct smbchg_chip *chip);
+static int get_prop_batt_health(struct smbchg_chip *chip);
+static int smbchg_charging_en(struct smbchg_chip *chip, bool en);
+static int smbchg_set_fastchg_current_raw(struct smbchg_chip *chip, int current_ma);
+
+void jeita_charging_polling_work_handler(struct work_struct *work) {
+    int voltage = 0;
+    int temp    = 0;
+    int current_set = 0;
+    int temp_charge_stop_flag = 0;
+    int temp_and_voltage_stop_flag = 0;
+
+    //renyongwei@wind-mobi.com 20180123  begin
+    int current_tmp = 0;
+    //renyongwei@wind-mobi.com 20180123  end
+
+    //renyongwei@wind-mobi.com 20180102  begin
+    int case_therm_Temp = 0;
+    //renyongwei@wind-mobi.com 20180102  end
+    int enter_low_tmep_flag = 0;
+    int enter_high_temp_vol_flag =0;
+
+    //liulinsheng@wind-mobi.com over        +++
+    static int over_voltage_stop = 0;
+    static int over_voltage_flag = 0;
+    int ret_val = 0;
+    //liulinsheng@wind-mobi.com over      ---
+
+    //******this for usb thermal and demoapp suspend charger******//
+    if (g_usb_temp_check_state == 1) {
+        disable_otg_usbthermal();
+    }
+    if(g_usb_temp_check_state == 1 ||demoapp_suspend_charger_flag == 1) {
+        smbchg_usb_suspend(chip_for_fg, true);
+    }
+    if((usb_to_demoapp_flag == 1 && demoapp_suspend_charger_flag == 0) || (demoapp_suspend_charger_flag == 0 && g_usb_temp_check_state ==0)){
+        smbchg_usb_suspend(chip_for_fg, false);
+    }
+    //******this for usb thermal and demoapp suspend charger******//
+
+
+    voltage = get_prop_batt_voltage_now(chip_for_fg);
+    temp    = get_prop_batt_temp(chip_for_fg);
+    pr_info("wind-log: --- voltage:%d, temp:%d\n", voltage,temp);
+/*
+    //renyongwei@wind-mobi.com 20180403 begin
+    if ((power_off_charger == 1) && (temp >= 600)) {
+        pr_err("wind-log: system restart then in SBL while loop\n");
+        kernel_restart(NULL);
+    }
+    //renyongwei@wind-mobi.com 20180403 end
+*/
+    if (temp >= 600) {
+        pr_err("wind-log: system restart then in SBL while loop\n");
+        kernel_restart(NULL);
+    }
+    //renyongwei@wind-mobi.com 20180102  begin
+    //printk("wind-log:qpnp-smbcharger asus_thermal_get_temp starting\n");
+    case_therm_Temp = asus_thermal_get_temp(pcb_tz_asus) / 1000;
+    //printk("wind-log:jeita_charging_polling_work_handler-case_therm_Temp=%d\n",case_therm_Temp);
+    //printk("wind-log:qpnp-smbcharger asus_thermal_get_temp ending\n");
+    //renyongwei@wind-mobi.com 20180102  end
+
+    //liulinsheng@wind-mobi.com over voltage +++
+    //this for over voltage
+    ret_val = get_vbus_voltage();
+    if(ret_val >= 6000000){
+        chip_for_fg->batt_overvoltage = 1;
+        get_prop_batt_health(chip_for_fg);
+        over_voltage_stop = 1;
+        over_voltage_flag = 1;
+        pr_info("wind-ret_val >= 6800000)");
+    }
+    if(ret_val <= 5600000){
+        chip_for_fg->batt_overvoltage = 0;
+        get_prop_batt_health(chip_for_fg);
+        over_voltage_flag = 0;
+        pr_info("wind-ret_val < 6600000)");
+    }
+
+    if((over_voltage_flag == 1) && ret_val > 5600000)
+    {
+        pr_info("wind-(over_voltage_flag == 1) && ret_val >= 6600000)\n");
+        over_voltage_stop = 1;
+    }else{
+        pr_info("wind-ret_val other");
+        over_voltage_stop = 0; 
+    }
+    //liulinsheng@wind-mobi.com over voltage ---
+
+    //low and high temp message +++  /
+    if(temp < 0){
+        chip_for_fg->batt_cold_new = 1;
+        get_prop_batt_health(chip_for_fg);
+        schedule_work(&chip_for_fg->usb_set_online_work);
+        enter_low_tmep_flag = 1;
+    } else
+        chip_for_fg->batt_cold_new = 0;
+
+    if (enter_low_tmep_flag == 1 && chip_for_fg->batt_cold_new == 0) {
+        enter_low_tmep_flag=0;
+        schedule_work(&chip_for_fg->usb_set_online_work);
+    }
+
+    if(temp > 550){
+        chip_for_fg->batt_hot_new = 1;
+        get_prop_batt_health(chip_for_fg);
+    }else
+        chip_for_fg->batt_hot_new = 0;
+    //low and high temp message ---
+
+    //renyongwei@wind-mobi.com 20180329 begin
+    if (temp>=0&&temp<100) {
+        current_set = 1000;
+        temp_charge_stop_flag = 0;
+    } else if (temp>=100&&temp<600&&voltage<= 4250000) {
+        current_set = 2000;
+        temp_charge_stop_flag = 0;
+    } else if (temp>=100&&temp<600&&voltage> 4250000) {
+        current_set = 1850;
+        temp_charge_stop_flag = 0;
+    } else {
+        temp_charge_stop_flag = 1;
+    }
+	if (temp >= 550){
+		temp_charge_stop_flag = 1;
+	}
+    pr_info("wind-jeita-test--- current_set=%d, temp_charge_stop_flag=%d", current_set, temp_charge_stop_flag); 
+    //renyongwei@wind-mobi.com 20180329 end
+
+    //this for temp and voltage
+    if (temp>=500&&temp<600&& voltage>= 4060000) {
+        temp_and_voltage_stop_flag = 1;
+        schedule_work(&chip_for_fg->usb_set_online_work);
+        printk("temp>=500&&temp<600&& voltage>= 4060000\n");
+        enter_high_temp_vol_flag = 1;
+    } else {
+        temp_and_voltage_stop_flag = 0;
+    }
+
+    if (enter_high_temp_vol_flag == 1 && temp_and_voltage_stop_flag == 0) {
+        enter_high_temp_vol_flag=0;
+        schedule_work(&chip_for_fg->usb_set_online_work);
+    }
+
+    //renyongwei@wind-mobi.com 20180123 begin
+    //******this for case_therm limit charge IC current******//
+    if((chip_for_fg->usb_supply_type == 5) && (adapter_id_dcp_flag = 1) && (current_set_global_bak == 0x14 || current_set_global_bak == 0xA))//renyongwei@wind-mobi.com 20180329 begin 0x19-->0x14
+    {
+        if(current_set_global_bak == 0x14)//renyongwei@wind-mobi.com 20180329 begin 0x19-->0x14
+        {
+            if(case_therm_Temp > 44)
+            { 
+                current_set_global = 0x8;
+                current_tmp = CURRENT_700_MA;
+                //printk("wind-log:case_therm_Temp > 42 IC=700mA\n");
+            }else if(case_therm_Temp > 42)
+            {
+                current_set_global = 0xA;
+                current_tmp = CURRENT_950_MA;
+                //printk("wind-log:case_therm_Temp 40<case_therm_Temp<=42 IC=950mA\n");
+            }else{
+                //current_set_global = 0x19;
+                //current_tmp = CURRENT_2000_MA;
+                //renyongwei@wind-mobi.com 20180329 begin
+                current_set_global = 0x14;
+                current_tmp = CURRENT_1880_MA;
+                //renyongwei@wind-mobi.com 20180329 end
+                //printk("wind-log:case_therm_Temp <=40 IC=2000mA\n");
+            }
+        }
+        else if(current_set_global_bak == 0xA)
+        {
+            if(case_therm_Temp > 44) {
+                current_set_global = 0x8;
+                current_tmp = CURRENT_700_MA;
+                //printk("wind-log:case_therm_Temp > 42 IC=700mA\n");
+            } else {
+                current_set_global = 0xA;
+                current_tmp = CURRENT_950_MA;
+                //printk("wind-log:case_therm_Temp <=42 IC=950mA\n");
+            }
+        }
+
+        if ( (adapter_id_dcp_flag != 0 ) && (( smbchg_set_high_usb_chg_current(chip_for_fg, current_tmp) ) < 0) )	
+            pr_info("[wind-log] ADAPTER_ID_FOURTH_STAGE_SET_CUR, Couldn't set current_tmp = %d mA, current_set_global=0x%x, ERROR !!!\n",current_tmp, current_set_global);
+        else
+            pr_info("[wind-log] ADAPTER_ID_FOURTH_STAGE_SET_CUR, set current_tmp = %d mA, current_set_global=0x%x, Successful .\n",current_tmp, current_set_global);
+    }
+    //renyongwei@wind-mobi.com 20180123 end
+
+    //set current
+    if(temp_charge_stop_flag == 1|| temp_and_voltage_stop_flag == 1 || batlife_stop_flag == 1 || demo_bat_stop_flag == 1 || over_voltage_stop == 1){     //liulinsheng@wind-mobi.com over voltage 
+        smbchg_charging_en(chip_for_fg, false);
+        printk("temp_charge_stop_flag == 1|| temp_and_voltage_stop_flag == 1");
+    } else {
+        smbchg_charging_en(chip_for_fg, true);
+        smbchg_set_fastchg_current_raw(chip_for_fg, current_set);
+    }
+
+    dump_regs_less(chip_for_fg);
+    schedule_delayed_work(&jeita_charging_polling_work, msecs_to_jiffies(10000));
+}
+#endif
+
+/**********************************************************************/
+
+static int smbchg_debug_mask = 0x00;
 module_param_named(
 	debug_mask, smbchg_debug_mask, int, S_IRUSR | S_IWUSR
 );
@@ -816,6 +1424,9 @@ static bool is_usb_present(struct smbchg_chip *chip)
 	int rc;
 	u8 reg;
 
+	/* wangs: for global usb_present */
+	usb_present = false;
+
 	rc = smbchg_read(chip, &reg, chip->usb_chgpth_base + RT_STS, 1);
 	if (rc < 0) {
 		dev_err(chip->dev, "Couldn't read usb rt status rc = %d\n", rc);
@@ -830,7 +1441,10 @@ static bool is_usb_present(struct smbchg_chip *chip)
 		return false;
 	}
 
-	return !!(reg & (USBIN_9V | USBIN_UNREG | USBIN_LV));
+	/* wangs: for global usb_present */
+	usb_present = !!(reg & (USBIN_9V | USBIN_UNREG | USBIN_LV));
+	//pr_info("wangs: global usb_present=%d\n", usb_present);
+	return usb_present;
 }
 
 static char *usb_type_str[] = {
@@ -931,6 +1545,11 @@ static int get_prop_batt_status(struct smbchg_chip *chip)
 	if (!charger_present)
 		return POWER_SUPPLY_STATUS_DISCHARGING;
 
+#ifdef CONFIG_WIND_ASUS_BATTERY_LIFE_SUPPORT
+    if (charger_present && bat_full_batlife == 1) {
+        return POWER_SUPPLY_STATUS_FULL;
+    }
+#endif
 	rc = smbchg_read(chip, &reg, chip->chgr_base + RT_STS, 1);
 	if (rc < 0) {
 		dev_err(chip->dev, "Unable to read RT_STS rc = %d\n", rc);
@@ -1166,6 +1785,14 @@ static int get_prop_batt_health(struct smbchg_chip *chip)
 		return POWER_SUPPLY_HEALTH_WARM;
 	else if (chip->batt_cool)
 		return POWER_SUPPLY_HEALTH_COOL;
+	//liulinsheng@wind-mobi.com 20171206 begin
+	else if (chip->batt_overvoltage)
+		return POWER_SUPPLY_HEALTH_OVERVOLTAGE;
+	else if (chip->batt_cold_new)
+		return POWER_SUPPLY_HEALTH_COLD;
+	else if (chip->batt_hot_new)
+		return POWER_SUPPLY_HEALTH_OVERHEAT;
+	//liulinsheng@wind-mobi.com 20171206 end
 	else
 		return POWER_SUPPLY_HEALTH_GOOD;
 }
@@ -1463,6 +2090,14 @@ static int smbchg_charging_en(struct smbchg_chip *chip, bool en)
 			EN_BAT_CHG_BIT, en ? 0 : EN_BAT_CHG_BIT);
 }
 
+//liulinsheng@wind-mobi.com 20180112 begin
+#define BB_CLMP_MASK_OTG  BIT(0)
+int disable_otg_usbthermal(void)
+{
+    return smbchg_sec_masked_write(chip_for_fg, chip_for_fg->bat_if_base + 0x42, BB_CLMP_MASK_OTG, 0);
+}
+//liulinsheng@wind-mobi.com 20180112 end
+
 #define CMD_IL			0x40
 #define USBIN_SUSPEND_BIT	BIT(4)
 #define CURRENT_100_MA		100
@@ -1472,7 +2107,7 @@ static int smbchg_charging_en(struct smbchg_chip *chip, bool en)
 #define CURRENT_1500_MA		1500
 #define SUSPEND_CURRENT_MA	2
 #define ICL_OVERRIDE_BIT	BIT(2)
-static int smbchg_usb_suspend(struct smbchg_chip *chip, bool suspend)
+int smbchg_usb_suspend(struct smbchg_chip *chip, bool suspend)   //liulinsheng@wind-mobi.com 20171109
 {
 	int rc;
 
@@ -1575,6 +2210,22 @@ static void smbchg_usb_update_online_work(struct work_struct *work)
 
 	online = user_enabled && chip->usb_present && !chip->very_weak_charger;
 
+#ifdef JEITA_CHARGING_POLLING_WORK
+    {
+        int temp = get_prop_batt_temp(chip);
+        int voltage = get_prop_batt_voltage_now(chip);
+
+        if (voltage > 0 && (power_off_charger == 0)) {
+            if ((temp < 0) || ((temp >= 500)&&(temp < 600)&&(voltage >= 4060000))) {
+                pr_info("wangs: JEITA discharge, setting usb psy online = 0\n");
+                online = 0;
+                //power_supply_set_online(chip->usb_psy, 0);//renyongwei@wind-mobi.com 20180116
+            }
+        }
+        pr_info("wangs: voltage:%d, temp:%d --- online=%d\n", voltage, temp, online);
+    }
+#endif
+
 	mutex_lock(&chip->usb_set_online_lock);
 	if (chip->usb_online != online) {
 		pr_smb(PR_MISC, "setting usb psy online = %d\n", online);
@@ -1645,6 +2296,20 @@ static int smbchg_set_high_usb_chg_current(struct smbchg_chip *chip,
 		return rc;
 	}
 
+#ifdef CONFIG_ASUS_ADAPTER_ID
+    if (current_set_global != 0) {
+        pr_info("[wind_adapter_id] start to set current usb_cur_val=0x%x (0x4=500mA)\n", current_set_global);
+        i = current_set_global;
+        rc = vote(chip->usb_icl_votable, PSY_ICL_VOTER, true, chip->tables.usb_ilim_ma_table[i]);
+        if (rc < 0) {
+            pr_err("Couldn't vote for new USB ICL rc=%d\n", rc);
+        }
+        current_set_global = 0;
+    } else {
+        pr_info("[wind_adapter_id] Type:%d adapter to set current_ma=%d, i=0x%x\n", chip->usb_supply_type, current_ma, i);
+    }
+#endif
+
 	usb_cur_val = i & USBIN_INPUT_MASK;
 	rc = smbchg_sec_masked_write(chip, chip->usb_chgpth_base + IL_CFG,
 				USBIN_INPUT_MASK, usb_cur_val);
@@ -1652,12 +2317,19 @@ static int smbchg_set_high_usb_chg_current(struct smbchg_chip *chip,
 		dev_err(chip->dev, "cannot write to config c rc = %d\n", rc);
 		return rc;
 	}
+	dump_reg(chip, chip->usb_chgpth_base + IL_CFG, "[wind_adapter_id] IL_CFG reg");
 
 	rc = smbchg_masked_write(chip, chip->usb_chgpth_base + CMD_IL,
 				USBIN_MODE_CHG_BIT, USBIN_HC_MODE);
 	if (rc < 0)
 		dev_err(chip->dev, "Couldn't write cfg 5 rc = %d\n", rc);
+	dump_reg(chip, chip->usb_chgpth_base + CMD_IL, "[wind_adapter_id] CMD_IL reg");
+
 	chip->usb_max_current_ma = chip->tables.usb_ilim_ma_table[i];
+
+	printk("[wind_adapter_id] usb_cur_val=0x%x ,current_set_global=0x%x, chip->usb_max_current_ma=%d mA, set current complete .\n",
+                usb_cur_val, current_set_global, chip->usb_max_current_ma);
+
 	return rc;
 }
 
@@ -1814,9 +2486,13 @@ static int smbchg_set_usb_current_max(struct smbchg_chip *chip,
 		}
 		/* fall through */
 	default:
+#ifdef CONFIG_ASUS_ADAPTER_ID
+	if (adapter_id_dcp_flag == 0)
+#endif
 		rc = smbchg_set_high_usb_chg_current(chip, current_ma);
 		if (rc < 0)
 			pr_err("Couldn't set %dmA rc = %d\n", current_ma, rc);
+		printk("[wind_adapter_id][%s]adapter_id_dcp_flag=%d (1=SKIP set currten), type=%d\n", __func__, adapter_id_dcp_flag, chip->usb_supply_type);
 		break;
 	}
 
@@ -4654,7 +5330,7 @@ static int smbchg_set_optimal_charging_mode(struct smbchg_chip *chip, int type)
 	return 0;
 }
 
-#define DEFAULT_SDP_MA		100
+#define DEFAULT_SDP_MA		500
 #define DEFAULT_CDP_MA		1500
 static int smbchg_change_usb_supply_type(struct smbchg_chip *chip,
 						enum power_supply_type type)
@@ -4668,7 +5344,21 @@ static int smbchg_change_usb_supply_type(struct smbchg_chip *chip,
 	 * used
 	 */
 	if (type != POWER_SUPPLY_TYPE_UNKNOWN)
+#ifdef CONFIG_ASUS_ADAPTER_ID
+	{
+#endif
 		chip->usb_supply_type = type;
+#ifdef CONFIG_ASUS_ADAPTER_ID
+        /* lihaiyan@wind-mobi add code here for adapter id +++ */
+        pr_info("[wind_adapter_id] type = %d\n", type);
+        if (chip->usb_supply_type == POWER_SUPPLY_TYPE_USB_DCP) {
+            current_set_global = 0x4;
+            adapter_id_dcp_flag = 1;
+            schedule_work(&work_adapter_id); 
+        }
+        /* lihaiyan@wind-mobi add code here for adapter id --- */
+	}
+#endif
 
 	/*
 	 * Type-C only supports STD(900), MEDIUM(1500) and HIGH(3000) current
@@ -4690,10 +5380,35 @@ static int smbchg_change_usb_supply_type(struct smbchg_chip *chip,
 	else
 		current_limit_ma = smbchg_default_dcp_icl_ma;
 
+#ifdef CONFIG_ASUS_ADAPTER_ID
+    if(adapter_id_dcp_flag == 1){
+        // lihaiyan@wind-mobi.com 20180102 +++
+        if (chip->usb_supply_type == 5) {
+            current_limit_ma = 500;
+        } else if(chip->usb_supply_type == 0) {
+            //renyongwei@wind-mobi.com 20180123 begin
+            current_set_global_bak = 0;
+            //renyongwei@wind-mobi.com 20180123 end
+            adapter_id_dcp_flag = 0;
+            current_limit_ma = 0;
+        }
+    }
+    pr_info("[adapter_id] Type %d: adapter_id_dcp_flag=%d, current_limit_ma=%d, chip->usb_max_current_ma=%d, current_set_global=0x%x\n",
+            type, adapter_id_dcp_flag, current_limit_ma,chip->usb_max_current_ma, current_set_global);
+#endif
 	pr_smb(PR_STATUS, "Type %d: setting mA = %d\n",
 		type, current_limit_ma);
+#ifdef CONFIG_ASUS_ADAPTER_ID
+	if (adapter_id_dcp_flag == 0) {
+#endif
 	rc = vote(chip->usb_icl_votable, PSY_ICL_VOTER, true,
 				current_limit_ma);
+#ifdef CONFIG_ASUS_ADAPTER_ID
+	} else {
+		rc = 0;
+		pr_info("[adapter_id] SKIP vote, type=%d, set current_limit_ma=%d\n", type, current_limit_ma);
+	}
+#endif
 	if (rc < 0) {
 		pr_err("Couldn't vote for new USB ICL rc=%d\n", rc);
 		goto out;
@@ -4993,6 +5708,13 @@ static void handle_usb_insertion(struct smbchg_chip *chip)
 	if (chip->typec_psy)
 		update_typec_status(chip);
 	smbchg_change_usb_supply_type(chip, usb_supply_type);
+
+    //liulinsheng@wind-mobi.com 20180112 begin
+    if(g_usb_temp_check_state == 2){
+        usb_to_demoapp_flag = 1;
+    }
+    //liulinsheng@wind-mobi.com 20180112 end
+
 	if (!chip->skip_usb_notification) {
 		pr_smb(PR_MISC, "setting usb psy present = %d\n",
 				chip->usb_present);
@@ -6167,6 +6889,7 @@ static enum power_supply_property smbchg_battery_properties[] = {
 	POWER_SUPPLY_PROP_RESTRICTED_CHARGING,
 	POWER_SUPPLY_PROP_ALLOW_HVDCP3,
 	POWER_SUPPLY_PROP_MAX_PULSE_ALLOWED,
+	POWER_SUPPLY_PROP_AP_THERMAL_TEMP,              //liulinsheng@wind-mobi.com
 };
 
 static int smbchg_battery_set_property(struct power_supply *psy,
@@ -6393,6 +7116,9 @@ static int smbchg_battery_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_MAX_PULSE_ALLOWED:
 		val->intval = chip->max_pulse_allowed;
+		break;
+	case POWER_SUPPLY_PROP_AP_THERMAL_TEMP:
+		val->intval = asus_thermal_get_temp(pcb_tz_asus) / 1000;
 		break;
 	default:
 		return -EINVAL;
@@ -6804,6 +7530,7 @@ static irqreturn_t usbin_uv_handler(int irq, void *_chip)
 		pr_err("could not read rt sts: %d", rc);
 		goto out;
 	}
+	pr_info("wangs: RT_STS=0x%x, reg=0x%x", chip->usb_chgpth_base + RT_STS, reg);
 
 	pr_smb(PR_STATUS,
 		"%s chip->usb_present = %d rt_sts = 0x%02x hvdcp_3_det_ignore_uv = %d aicl = %d\n",
@@ -7030,7 +7757,28 @@ static irqreturn_t usbid_change_handler(int irq, void *_chip)
 		power_supply_set_usb_otg(chip->usb_psy, otg_present ? 1 : 0);
 	}
 	if (otg_present)
+#ifdef CONFIG_OTG_CTL_INPUT_KEY
+	{
+#endif
 		pr_smb(PR_STATUS, "OTG detected\n");
+#ifdef CONFIG_OTG_CTL_INPUT_KEY
+        if (otg_ctl_input) {
+            input_report_key(otg_ctl_input, OTG_CABLE_IN, 1);
+            input_sync(otg_ctl_input);
+            input_report_key(otg_ctl_input, OTG_CABLE_IN, 0);
+            input_sync(otg_ctl_input);
+            pr_info("[wind:]otg input report cable-in event\n");
+        }
+    } else {
+        if (otg_ctl_input) {
+            input_report_key(otg_ctl_input, OTG_CABLE_OUT, 1);
+            input_sync(otg_ctl_input);
+            input_report_key(otg_ctl_input, OTG_CABLE_OUT, 0);
+            input_sync(otg_ctl_input);
+            pr_info("[wind:]otg input report cable-out event\n");
+        }
+    }
+#endif
 
 	/* update FG */
 	set_property_on_fg(chip, POWER_SUPPLY_PROP_STATUS,
@@ -7050,6 +7798,9 @@ static int determine_initial_status(struct smbchg_chip *chip)
 	 * status only in interrupt handling code
 	 */
 
+	//renyongwei@wind-mobi.com 20180403 begin
+	int rc = 0 ;
+	//renyongwei@wind-mobi.com 20180403 end
 	batt_pres_handler(0, chip);
 	batt_hot_handler(0, chip);
 	batt_warm_handler(0, chip);
@@ -7069,6 +7820,12 @@ static int determine_initial_status(struct smbchg_chip *chip)
 		pr_smb(PR_MISC, "setting usb psy dp=f dm=f\n");
 		power_supply_set_dp_dm(chip->usb_psy,
 				POWER_SUPPLY_DP_DM_DPF_DMF);
+		//renyongwei@wind-mobi.com 20180403 begin
+		pr_info("wind-log: usb_supply_type=%d\n", chip->usb_supply_type);
+		rc = rerun_apsd(chip);
+		if (rc)
+			pr_err("APSD rerun failed rc=%d\n", rc);
+		//renyongwei@wind-mobi.com 20180403 end
 		handle_usb_insertion(chip);
 	} else {
 		handle_usb_removal(chip);
@@ -8248,6 +9005,20 @@ static inline void dump_reg(struct smbchg_chip *chip, u16 addr,
 	pr_smb(PR_DUMP, "%s - %04X = %02X\n", name, addr, reg);
 }
 
+static void dump_regs_less(struct smbchg_chip *chip)
+{
+	u16 addr;
+
+	/* charger peripheral */
+	for (addr = 0xC; addr <= 0xD; addr++)
+		dump_reg(chip, chip->chgr_base + addr, "CHGR Status");
+
+	/* usb charge path peripheral */
+	for (addr = 0x7; addr <= 0x8; addr++)
+		dump_reg(chip, chip->usb_chgpth_base + addr, "USB Status");
+	dump_reg(chip, chip->usb_chgpth_base + CMD_IL, "USB Command");
+}
+
 /* dumps useful registers for debug */
 static void dump_regs(struct smbchg_chip *chip)
 {
@@ -8355,7 +9126,15 @@ static int smbchg_check_chg_version(struct smbchg_chip *chip)
 		/* PMI8937/PMI8940 doesn't support HVDCP */
 		if ((pmic_rev_id->pmic_subtype == PMI8937)
 			|| (pmic_rev_id->pmic_subtype == PMI8940))
+        {
 			chip->hvdcp_not_supported = true;
+            pr_err("wangs: pmic=%s, hvdcp_supported=%s, only allow 5V charger\n", pmic_rev_id->pmic_name, chip->hvdcp_not_supported ? "false" : "true");
+            rc = smbchg_sec_masked_write(chip, chip->usb_chgpth_base + USBIN_CHGR_CFG, ADAPTER_ALLOWANCE_MASK, 0x0);
+            if (rc < 0) {
+                pr_err("wangs: Couldn't write 0x%x usb allowance rc=%d\n", chip->usb_chgpth_base + USBIN_CHGR_CFG, rc);
+                return rc;
+            }
+        }
 		break;
 	case PMI8996:
 		chip->wa_flags |= SMBCHG_CC_ESR_WA
@@ -8434,6 +9213,12 @@ static int smbchg_probe(struct spmi_device *spmi)
 	struct qpnp_vadc_chip *vadc_dev = NULL, *vchg_vadc_dev = NULL;
 	const char *typec_psy_name;
 
+#ifdef CONFIG_OTG_CTL_INPUT_KEY
+    if (otg_ctl_input == NULL) {
+        otg_ctl_init_input();
+    }
+#endif
+
 	usb_psy = power_supply_get_by_name("usb");
 	if (!usb_psy) {
 		pr_smb(PR_STATUS, "USB supply not found, deferring probe\n");
@@ -8480,11 +9265,48 @@ static int smbchg_probe(struct spmi_device *spmi)
 		}
 	}
 
+#ifdef CONFIG_USBIN_VADC
+	if (of_find_property(spmi->dev.of_node, "qcom,usbin-vadc", NULL)) {
+		usbin_vadc_dev = qpnp_get_vadc(&spmi->dev, "usbin");
+		if (IS_ERR(usbin_vadc_dev)) {
+			rc = PTR_ERR(usbin_vadc_dev);
+			if (rc != -EPROBE_DEFER)
+				pr_err("[adapter_id] Couldn't get vadc 'usbin-vadc' rc=%d\n", rc);
+		} else {
+			qpnp_vadc_flag = 1;
+			pr_info("[adapter_id] get vadc 'usbin' success, qpnp_vadc_flag=%d\n", qpnp_vadc_flag);
+		}
+	}
+#endif
+
+#ifdef CONFIG_ASUS_ADAPTER_ID
+	if (of_find_property(spmi->dev.of_node, "qcom,mpp1-vadc", NULL)) {
+		mpp1_vadc_dev = qpnp_get_vadc(&spmi->dev, "mpp1");
+		if (IS_ERR(mpp1_vadc_dev)) {
+			rc = PTR_ERR(mpp1_vadc_dev);
+			if (rc != -EPROBE_DEFER)
+				printk("[wind_adapter_id] Couldn't get vadc 'mpp1' rc=%d\n",
+						rc);
+			return rc;
+		}else{
+			pr_info("[wind_adapter_id] get vadc 'mpp1' success, check adapter id\n");
+		}
+	}
+#endif
+
 	chip = devm_kzalloc(&spmi->dev, sizeof(*chip), GFP_KERNEL);
 	if (!chip) {
 		dev_err(&spmi->dev, "Unable to allocate memory\n");
 		return -ENOMEM;
 	}
+	chip_for_fg = chip;
+
+#ifdef CONFIG_ASUS_ADAPTER_ID
+    adapter_id_gpio_hw_setting();
+    pr_info("[wind_adapter_id] start to init adapter_id_wake_lock !!! \n");
+    wake_lock_init(&adapter_id_wake_lock, WAKE_LOCK_SUSPEND, "adapter_id_wake_lock");
+    INIT_WORK(&work_adapter_id, adapter_id_main);
+#endif
 
 	chip->fcc_votable = create_votable("BATT_FCC",
 			VOTE_MIN,
@@ -8598,6 +9420,11 @@ static int smbchg_probe(struct spmi_device *spmi)
 	mutex_init(&chip->wipower_config);
 	mutex_init(&chip->usb_status_lock);
 	device_init_wakeup(chip->dev, true);
+
+#ifdef JEITA_CHARGING_POLLING_WORK
+    INIT_DELAYED_WORK(&jeita_charging_polling_work, jeita_charging_polling_work_handler);
+    schedule_delayed_work(&jeita_charging_polling_work, msecs_to_jiffies(10000));	//10000
+#endif
 
 	rc = smbchg_parse_peripherals(chip);
 	if (rc) {
@@ -8748,6 +9575,10 @@ votables_cleanup:
 		destroy_votable(chip->usb_icl_votable);
 	if (chip->fcc_votable)
 		destroy_votable(chip->fcc_votable);
+#ifdef CONFIG_ASUS_ADAPTER_ID
+	pr_info("[wind_adapter_id] start to destroy adapter_id_wake_lock !!! \n");
+	wake_lock_destroy(&adapter_id_wake_lock);   // lihaiyan@wind-mobi.com
+#endif
 	return rc;
 }
 
@@ -8770,6 +9601,10 @@ static int smbchg_remove(struct spmi_device *spmi)
 	destroy_votable(chip->dc_icl_votable);
 	destroy_votable(chip->usb_icl_votable);
 	destroy_votable(chip->fcc_votable);
+#ifdef CONFIG_ASUS_ADAPTER_ID
+	pr_info("[wind_adapter_id] start to destroy adapter_id_wake_lock !!! \n");
+	wake_lock_destroy(&adapter_id_wake_lock);   // lihaiyan@wind-mobi.com
+#endif
 
 	return 0;
 }

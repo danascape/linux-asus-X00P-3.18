@@ -1503,6 +1503,9 @@ static void fg_cap_learning_update(struct fg_chip *chip)
 		goto out;
 	}
 
+	if (chip->charge_status == chip->prev_charge_status)
+		goto out;
+
 	rc = fg_get_sram_prop(chip, FG_SRAM_BATT_SOC, &batt_soc);
 	if (rc < 0) {
 		pr_err("Error in getting ACT_BATT_CAP, rc=%d\n", rc);
@@ -2226,6 +2229,9 @@ static int fg_esr_timer_config(struct fg_chip *chip, bool sleep)
 
 static void fg_batt_avg_update(struct fg_chip *chip)
 {
+	if (chip->charge_status == chip->prev_charge_status)
+		return;
+
 	cancel_delayed_work_sync(&chip->batt_avg_work);
 	fg_circ_buf_clr(&chip->ibatt_circ_buf);
 	fg_circ_buf_clr(&chip->vbatt_circ_buf);
@@ -2456,6 +2462,7 @@ static void status_change_work(struct work_struct *work)
 	}
 
 	fg_batt_avg_update(chip);
+	chip->prev_charge_status = chip->charge_status;
 out:
 	fg_dbg(chip, FG_STATUS, "charge_status:%d charge_type:%d charge_done:%d\n",
 		chip->charge_status, chip->charge_type, chip->charge_done);
@@ -4730,6 +4737,7 @@ static int fg_gen3_probe(struct spmi_device *spmi)
 	chip->debug_mask = &fg_gen3_debug_mask;
 	chip->irqs = fg_irqs;
 	chip->charge_status = -EINVAL;
+	chip->prev_charge_status = -EINVAL;
 	chip->ki_coeff_full_soc = -EINVAL;
 	chip->spmi = spmi;
 

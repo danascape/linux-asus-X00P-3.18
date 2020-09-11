@@ -35,6 +35,10 @@
 #include <linux/string_helpers.h>
 #include <linux/alarmtimer.h>
 #include <linux/qpnp/qpnp-revid.h>
+#include <linux/proc_fs.h>
+#define AGING_POWER_TEST
+#define CONFIG_WIND_ASUS_BATTERY_LIFE_RDWR_PROINFO
+#define SWITCH_BATTERY_NAME
 
 /* Register offsets */
 
@@ -310,7 +314,7 @@ static struct fg_mem_data fg_backup_regs[FG_BACKUP_MAX] = {
 	BACKUP(MAH_TO_SOC,	0x4A0,   0,      4,     -EINVAL),
 };
 
-static int fg_debug_mask;
+static int fg_debug_mask = 0x00;
 module_param_named(
 	debug_mask, fg_debug_mask, int, S_IRUSR | S_IWUSR
 );
@@ -707,6 +711,265 @@ static char *fg_supplicants[] = {
 	"bcl",
 	"fg_adc"
 };
+//liqiang@wind-mobi.com 20171225 begin
+ struct fg_chip *g_fg_chip;
+//liqiang@wind-mobi.com 20171025 end
+
+static int get_prop_capacity(struct fg_chip *chip);
+
+/* ****************************************************** */
+#ifdef AGING_POWER_TEST
+unsigned int proc_charger_state = 2; /* 0, (1=2) */
+unsigned int proc_charger_demoapp_state = 0;
+int demoapp_stop_flag = 0;
+int demo_bat_stop_flag = 0;
+int demoapp_suspend_charger_flag = 0;
+#define AGING_POWER_TEST_PROC_FOLDER "aging_power_test"
+#define AGING_POWER_TEST_PROC_CHARGING_CHARGESTATE "Charging_ChargeState"
+#define AGING_POWER_TEST_PROC_CHARGING_DEMOAPP_CHARGESTATE "Charging_DemoApp_ChargeState"
+
+static struct proc_dir_entry *aging_power_test_proc_dir = NULL;
+static struct proc_dir_entry *proc_Charging_ChargeState_file = NULL;
+static struct proc_dir_entry *proc_Charging_DemoApp_ChargeState_file = NULL;
+
+static int Charging_ChargeState_show(struct seq_file *m, void *v)
+{
+    return seq_printf(m, "%u\n", proc_charger_state);
+}
+static int Charging_ChargeState_read(struct inode *inode, struct file *file)
+{
+    return single_open(file, Charging_ChargeState_show, NULL);
+}
+static ssize_t Charging_ChargeState_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
+{
+    unsigned long temp = 0;
+    int err = kstrtoul_from_user(buffer, count, 0, &temp);
+    if (err)
+        return err;
+    proc_charger_state = (unsigned int)temp;
+    return count;
+}
+
+static const struct file_operations proc_Charging_ChargeState_file_ops = {
+    .open		= Charging_ChargeState_read,
+    .read		= seq_read,
+    .llseek		= seq_lseek,
+    .write 		= Charging_ChargeState_write,
+    .release	= single_release,
+};
+
+static int Charging_ChargeState_demoapp_show(struct seq_file *m, void *v)
+{
+    return seq_printf(m, "%u\n", proc_charger_demoapp_state);
+}
+static int Charging_DemoApp_ChargeState_read(struct inode *inode, struct file *file)
+{
+    return single_open(file, Charging_ChargeState_demoapp_show, NULL);
+}
+static ssize_t Charging_DemoApp_ChargeState_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
+{
+    unsigned long temp = 0;
+    int err = kstrtoul_from_user(buffer, count, 0, &temp);
+    if (err)
+        return err;
+    proc_charger_demoapp_state = (unsigned int)temp;
+    return count;
+}
+
+static const struct file_operations proc_Charging_DemoApp_ChargeState_file_ops = {
+    .open		= Charging_DemoApp_ChargeState_read,
+    .read		= seq_read,
+    .llseek		= seq_lseek,
+    .write 		= Charging_DemoApp_ChargeState_write,
+    .release	= single_release,
+};
+
+static int aging_power_test_proc_init(void)
+{
+    aging_power_test_proc_dir = proc_mkdir(AGING_POWER_TEST_PROC_FOLDER, NULL);
+    if (aging_power_test_proc_dir == NULL)
+    {
+        pr_err("wind %s: aging_power_test_proc_dir file create failed!\n", __func__);
+        return -ENOMEM;
+    }
+
+    proc_Charging_ChargeState_file = proc_create(AGING_POWER_TEST_PROC_CHARGING_CHARGESTATE, (S_IRUGO | S_IWUSR), 
+            aging_power_test_proc_dir, &proc_Charging_ChargeState_file_ops);
+    if(proc_Charging_ChargeState_file == NULL)
+    {
+        pr_err("wind %s: proc_Charging_ChargeState_file file create failed!\n", __func__);
+        remove_proc_entry( AGING_POWER_TEST_PROC_CHARGING_CHARGESTATE, aging_power_test_proc_dir );
+        return -ENOMEM;
+    }
+
+    proc_Charging_DemoApp_ChargeState_file = proc_create(AGING_POWER_TEST_PROC_CHARGING_DEMOAPP_CHARGESTATE, (S_IWUSR|S_IWUSR), 
+            aging_power_test_proc_dir, &proc_Charging_DemoApp_ChargeState_file_ops);
+    if(proc_Charging_DemoApp_ChargeState_file == NULL)
+    {
+        pr_err("wind %s: proc_Charging_DemoApp_ChargeState_file create failed!\n", __func__);
+        remove_proc_entry( AGING_POWER_TEST_PROC_CHARGING_DEMOAPP_CHARGESTATE, aging_power_test_proc_dir );
+        return -ENOMEM;
+    }
+
+    pr_info("wind %s: end\n", __func__);
+
+    return 0 ;
+}
+#endif	//AGING_POWER_TEST
+
+#ifdef CONFIG_WIND_ASUS_BATTERY_LIFE_SUPPORT
+signed int UI_SOC_BATLIFE = 0;
+int batlife_stop_flag = 0;
+bool bat_full_batlife = false;
+#define BATTERY_INIT_MODE   0
+#define BATTERY_NORMAL_MODE 1
+#define BATTERY_LIFE_MODE 2
+typedef struct {
+    unsigned char Batlife_mode;
+    unsigned char Batlife2Normal;
+    unsigned char Normal2Batlife;
+} BAT_LIFE_Struct;
+BAT_LIFE_Struct BATLIFE_status;
+
+static ssize_t show_Charging_batterylife(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    return sprintf(buf, "Batlife_mode = %d, Batlife2Normal = %c, Normal2Batlife = %c \n", BATLIFE_status.Batlife_mode, BATLIFE_status.Batlife2Normal, BATLIFE_status.Normal2Batlife);
+}
+static ssize_t store_Charging_batterylife(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+{
+    unsigned int temp = 0;
+    sscanf(buf, "%u", &temp);
+    pr_info("wind-log bm temp = %d\n", temp);
+    pr_info("wind-log before Batlife_mode = %d, Batlife2Normal = %c, Normal2Batlife = %c \n", BATLIFE_status.Batlife_mode, BATLIFE_status.Batlife2Normal,  BATLIFE_status.Normal2Batlife);
+
+    if(temp == BATTERY_NORMAL_MODE){
+        BATLIFE_status.Batlife_mode = BATTERY_NORMAL_MODE;
+    } else if(temp == BATTERY_LIFE_MODE) {
+        BATLIFE_status.Batlife_mode = BATTERY_LIFE_MODE;
+    }
+    //set_rtc_spare_batlife_value(&BATLIFE_status); // save status to rtc memory
+    pr_info("wind-log after Batlife_mode = %d, Batlife2Normal = %c, Normal2Batlife = %c \n", BATLIFE_status.Batlife_mode, BATLIFE_status.Batlife2Normal,  BATLIFE_status.Normal2Batlife);
+    return size;
+}
+
+static DEVICE_ATTR(Charging_batterylife, 0664, show_Charging_batterylife, store_Charging_batterylife);
+static struct attribute *Charging_batterylife_attributes[] = {
+    &dev_attr_Charging_batterylife.attr,
+    NULL,
+};
+static struct attribute_group Charging_batterylife_attr_group = {
+    .attrs = Charging_batterylife_attributes
+};
+#endif	//CONFIG_WIND_ASUS_BATTERY_LIFE_SUPPORT
+
+#ifdef CONFIG_WIND_ASUS_BATTERY_LIFE_RDWR_PROINFO
+extern int wind_diag_backup_file_write(char * path, char *w_buf, int w_len);
+extern int wind_diag_file_read(char * path, char *r_buf, int r_len);
+
+#define  buffer_proinfo_1_SIZE (1024 * 1)
+unsigned char buffer_proinfo_1[buffer_proinfo_1_SIZE];
+unsigned char buffer_proinfo_1_u[buffer_proinfo_1_SIZE];
+#define PROINFO_BUFFER_PATH_BACKUP "/dev/block/bootdevice/by-name/proinfo"
+
+struct delayed_work batterylife_charging_polling_work;
+
+void batterylife_charging_polling_work_handle(struct work_struct *work)
+{
+    static int init_flag = 0;
+
+    if (init_flag == 0) {
+        BATLIFE_status.Batlife_mode = BATTERY_NORMAL_MODE;//modify default batlifemode
+        memset(buffer_proinfo_1_u, 0, buffer_proinfo_1_SIZE);
+
+        if (wind_diag_file_read(PROINFO_BUFFER_PATH_BACKUP, buffer_proinfo_1_u, buffer_proinfo_1_SIZE) == 1024) {
+            init_flag = 1;
+            pr_info("wind_log: init_flag = %d, [590]byte:%c, [592]byte:%c \n", init_flag, buffer_proinfo_1_u[590], buffer_proinfo_1_u[592]);
+
+            if((buffer_proinfo_1_u[590]=='n') || (buffer_proinfo_1_u[590]=='y')) {
+                BATLIFE_status.Batlife2Normal = buffer_proinfo_1_u[590];
+            } else {
+                BATLIFE_status.Batlife2Normal = 'y';
+            }
+            if((buffer_proinfo_1_u[592]=='n') || (buffer_proinfo_1_u[592]=='y')) {
+                BATLIFE_status.Normal2Batlife = buffer_proinfo_1_u[592];
+            } else {
+                BATLIFE_status.Normal2Batlife = 'n';
+            }
+        } else {
+            BATLIFE_status.Normal2Batlife = 'n';
+            BATLIFE_status.Batlife2Normal = 'y';
+            pr_err("wangs: wind_diag_file_read fail, use normal mode=%d .\n", BATLIFE_status.Batlife_mode);
+            return;
+        }
+    }
+
+    if (init_flag == 1) {
+        if (get_prop_capacity(g_fg_chip) < 40) {
+            pr_info("wind_log: BATLIFE_status.Normal2Batlife = %c \n", BATLIFE_status.Normal2Batlife);
+            if (BATLIFE_status.Batlife_mode == BATTERY_NORMAL_MODE) {
+                if (BATLIFE_status.Batlife2Normal != 'y') {
+                    BATLIFE_status.Normal2Batlife = 'n';
+                    BATLIFE_status.Batlife2Normal = 'y';
+                }
+            } else if (BATLIFE_status.Batlife_mode == BATTERY_LIFE_MODE) {
+                if(BATLIFE_status.Normal2Batlife != 'y') {
+                    BATLIFE_status.Normal2Batlife = 'y';
+                    BATLIFE_status.Batlife2Normal = 'n';
+                }
+            }
+
+            memset(buffer_proinfo_1, 0, buffer_proinfo_1_SIZE);
+            wind_diag_file_read(PROINFO_BUFFER_PATH_BACKUP, buffer_proinfo_1, buffer_proinfo_1_SIZE);//set value then read
+            pr_info("wind_log: begin [590]byte:%c, [592]byte:%c \n", buffer_proinfo_1[590], buffer_proinfo_1[592]);
+
+            buffer_proinfo_1_u[590] = BATLIFE_status.Batlife2Normal;
+            buffer_proinfo_1_u[592] = BATLIFE_status.Normal2Batlife;
+            memcpy(buffer_proinfo_1, &buffer_proinfo_1_u[0], 1024);
+            wind_diag_backup_file_write(PROINFO_BUFFER_PATH_BACKUP, buffer_proinfo_1, buffer_proinfo_1_SIZE);
+
+            wind_diag_file_read(PROINFO_BUFFER_PATH_BACKUP, buffer_proinfo_1, buffer_proinfo_1_SIZE);
+            pr_info("wind_log: end [590]byte:%c, [592]byte:%c \n", buffer_proinfo_1[590], buffer_proinfo_1[592]);
+        } else {
+            schedule_delayed_work(&batterylife_charging_polling_work, msecs_to_jiffies(20000));
+            return;
+        }
+    }
+
+    pr_info("wind_log: Batlife_mode = %d, Batlife2Normal = %c, Normal2Batlife= %c \n", BATLIFE_status.Batlife_mode, BATLIFE_status.Batlife2Normal, BATLIFE_status.Normal2Batlife);
+    schedule_delayed_work(&batterylife_charging_polling_work, msecs_to_jiffies(10000));
+}
+#endif //CONFIG_WIND_ASUS_BATTERY_LIFE_RDWR_PROINFO
+
+#ifdef SWITCH_BATTERY_NAME
+#include <linux/switch.h>
+static struct switch_dev battery_switch_dev;
+extern char g_switch_battery_info[100];
+
+ssize_t switch_battery_print_name(struct switch_dev *sdev, char *buf) {
+    if (g_switch_battery_info != NULL && strlen(g_switch_battery_info))
+        return sprintf(buf, "%s\n", g_switch_battery_info);
+    else
+        return sprintf(buf, "%s\n", g_fg_chip->batt_type);
+}
+
+static int switch_battery_register(void) {
+    int rc;
+
+    battery_switch_dev.name = "battery";
+    battery_switch_dev.index = 0;
+    battery_switch_dev.state = 0;
+    battery_switch_dev.print_name = switch_battery_print_name;
+
+    pr_info("wangs: %s '/sys/class/switch/battery/name'\n", __func__);
+    rc = switch_dev_register(&battery_switch_dev);
+    if (rc) {
+        pr_err("wangs: battery switch dev registration failed\n");
+    }
+    return rc;
+}
+#endif	//SWITCH_BATTERY_NAME
+/* ******************************************************* */
+
 
 #define DEBUG_PRINT_BUFFER_SIZE 64
 static void fill_string(char *str, size_t str_len, u8 *buf, int buf_len)
@@ -2028,6 +2291,8 @@ static void fg_handle_battery_insertion(struct fg_chip *chip)
 
 static int soc_to_setpoint(int soc)
 {
+	pr_err("wangs %s: soc_to_setpoint = %d\n", __FILE__, soc);
+	if (soc == 1) return 1;
 	return DIV_ROUND_CLOSEST(soc * 255, 100);
 }
 
@@ -2242,6 +2507,81 @@ static int get_monotonic_soc_raw(struct fg_chip *chip)
 #define MISSING_CAPACITY	100
 #define FULL_CAPACITY		100
 #define FULL_SOC_RAW		0xFF
+
+static int get_battery_capacity(int msoc)
+{
+    int UI_SOC = DIV_ROUND_CLOSEST((msoc - 1) * (FULL_CAPACITY - 2),FULL_SOC_RAW - 2) + 1;
+
+#if defined(AGING_POWER_TEST)
+    if (proc_charger_state == 0) {
+        pr_err("wind proc_charger_state = %d, Stop charging\n", proc_charger_state);
+    } else if (proc_charger_state == 1) {
+        proc_charger_state = 2;
+        //pr_err("wind  proc_charger_state = %d, START charging\n", proc_charger_state);
+    }
+
+    if (proc_charger_demoapp_state == 1) { //this for demo app
+        if (UI_SOC >= 60) {
+            demoapp_stop_flag = 1;
+            demoapp_suspend_charger_flag = 1;
+            pr_err("wind: demoapp_stop_flag	=%d,UI_SOC = %d  Stop\n",  demoapp_stop_flag,UI_SOC);
+        } else if (UI_SOC < 55 && demoapp_stop_flag == 1){
+            demoapp_stop_flag = 0;
+            pr_err("wind: demoapp_stop_flag	=%d,UI_SOC = %d  START\n",  demoapp_stop_flag,UI_SOC);
+        } else if ((UI_SOC >= 55) && (demoapp_stop_flag == 1) && (UI_SOC <= 60)){
+            if(58 >= UI_SOC){
+                demoapp_suspend_charger_flag = 0;
+                pr_err("wind: suspend_charge-UI_SOC2 = %d Stop\n", UI_SOC);
+            }
+            pr_err("wind: demoapp_stop_flag	=%d,UI_SOC1 = %d Stop\n",  demoapp_stop_flag,UI_SOC);
+        } else if ((UI_SOC >= 55) && (demoapp_stop_flag == 0) && (UI_SOC <= 60)){
+            // do nothing
+        }
+    } else {
+        demoapp_stop_flag = 0;
+        //pr_err("wind  demoapp_stop_flag	=%d,UI_SOC = %d START\n", demoapp_stop_flag, UI_SOC);
+    }
+
+    if((proc_charger_state == 0) || (demoapp_stop_flag == 1 && proc_charger_demoapp_state == 1)) {
+        demo_bat_stop_flag = 1;
+        pr_err("wind: Stop proc_charger_state=%d, demoapp_stop_flag=%d, proc_charger_demoapp_state=%d, UI_SOC=%d\n",
+                proc_charger_state,demoapp_stop_flag,proc_charger_demoapp_state,UI_SOC);
+    } else {
+        demo_bat_stop_flag = 0;
+        pr_info("wind: Start proc_charger_state=%d, demoapp_stop_flag=%d, proc_charger_demoapp_state=%d, UI_SOC=%d\n",
+                proc_charger_state,demoapp_stop_flag,proc_charger_demoapp_state,UI_SOC);
+    }
+#endif	//AGING_POWER_TEST
+
+#ifdef CONFIG_WIND_ASUS_BATTERY_LIFE_SUPPORT
+    if ((BATLIFE_status.Normal2Batlife == 'y') && (UI_SOC >= 40)) {
+        UI_SOC_BATLIFE = 40 + (UI_SOC-40)*60/40;
+        if (UI_SOC_BATLIFE >= 100) {
+            UI_SOC_BATLIFE = 100;
+        }
+
+        if (UI_SOC >= 80) {
+            bat_full_batlife = true;
+            batlife_stop_flag = 1;
+        } else {
+            bat_full_batlife = false;
+            batlife_stop_flag = 0;
+        }
+        pr_info("wind: bat_full_batlife=%d, batlife_stop_flag=%d, UI_SOC=%d, UI_SOC_BATLIFE=%d\n", bat_full_batlife, batlife_stop_flag, UI_SOC, UI_SOC_BATLIFE);
+    } else {
+        if (UI_SOC >= 100) {
+            bat_full_batlife = true;
+        } else {
+            bat_full_batlife = false;
+            batlife_stop_flag = 0;
+            //pr_info("wind: bat_full_batlife=%d, batlife_stop_flag=%d, UI_SOC=%d, UI_SOC_BATLIFE=%d\n", bat_full_batlife, batlife_stop_flag, UI_SOC, UI_SOC_BATLIFE);
+        }
+    }
+#endif
+
+    return UI_SOC;
+}
+
 static int get_prop_capacity(struct fg_chip *chip)
 {
 	int msoc, rc;
@@ -2258,8 +2598,10 @@ static int get_prop_capacity(struct fg_chip *chip)
 	if (chip->battery_missing)
 		return MISSING_CAPACITY;
 
-	if (!chip->profile_loaded && !chip->use_otp_profile)
+	if (!chip->profile_loaded && !chip->use_otp_profile) {
+		pr_err("wangs: profile is false, return %d\n", DEFAULT_CAPACITY);
 		return DEFAULT_CAPACITY;
+	}
 
 	if (chip->charge_full)
 		return FULL_CAPACITY;
@@ -2294,8 +2636,11 @@ static int get_prop_capacity(struct fg_chip *chip)
 		return FULL_CAPACITY;
 	}
 
+	return get_battery_capacity(msoc);
+#if 0
 	return DIV_ROUND_CLOSEST((msoc - 1) * (FULL_CAPACITY - 2),
 			FULL_SOC_RAW - 2) + 1;
+#endif
 }
 
 #define HIGH_BIAS	3
@@ -4035,7 +4380,7 @@ static void status_change_work(struct work_struct *work)
 
 	if (chip->status == POWER_SUPPLY_STATUS_FULL) {
 		if (capacity >= 99 && chip->hold_soc_while_full
-				&& chip->health == POWER_SUPPLY_HEALTH_GOOD) {
+				&& (chip->health == POWER_SUPPLY_HEALTH_GOOD || chip->health == POWER_SUPPLY_HEALTH_COOL)) {
 			if (fg_debug_mask & FG_STATUS)
 				pr_info("holding soc at 100\n");
 			chip->charge_full = true;
@@ -4590,6 +4935,12 @@ static int fg_power_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
 		val->intval = get_prop_capacity(chip);
+#ifdef CONFIG_WIND_ASUS_BATTERY_LIFE_SUPPORT
+        if ((BATLIFE_status.Normal2Batlife == 'y') && (val->intval >= 40)) {
+            printk("wind-log UI_SOC_BATLIFE = %d\n",UI_SOC_BATLIFE);
+            val->intval = UI_SOC_BATLIFE;
+        }
+#endif
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY_RAW:
 		val->intval = get_sram_prop_now(chip, FG_DATA_BATT_SOC);
@@ -4685,6 +5036,32 @@ static int fg_power_get_property(struct power_supply *psy,
 	return 0;
 }
 
+//liqiang@wind-mobi.com 20171025  begin
+int diag_get_batt_info(int flag)
+{
+	int rs = 0;
+	int  unused = 0;
+	update_sram_data(g_fg_chip, &unused); // update data now
+	
+	switch (flag){
+		case 0:
+			rs = get_prop_capacity(g_fg_chip);
+		break;
+		case 1:
+			rs = get_sram_prop_now(g_fg_chip, FG_DATA_VOLTAGE);
+		break;
+		case 2:
+			rs = get_sram_prop_now(g_fg_chip, FG_DATA_CURRENT);
+		break;
+	}
+	printk("wind-log fg: flag = %d, rs = %d", flag, rs);
+
+	if(rs < 0)
+		rs *= -1;
+	
+	return rs;
+}
+//liqiang@wind-mobi.com 20171025 end
 static int fg_power_set_property(struct power_supply *psy,
 				  enum power_supply_property psp,
 				  const union power_supply_propval *val)
@@ -6310,7 +6687,7 @@ fail:
 #define PROFILE_COMPARE_LEN		32
 #define THERMAL_COEFF_ADDR		0x444
 #define THERMAL_COEFF_OFFSET		0x2
-#define BATTERY_PSY_WAIT_MS		2000
+#define BATTERY_PSY_WAIT_MS		1000     //2000
 static int fg_batt_profile_init(struct fg_chip *chip)
 {
 	int rc = 0, ret;
@@ -8705,6 +9082,9 @@ static int fg_probe(struct spmi_device *spmi)
 		pr_err("Can't allocate fg_chip\n");
 		return -ENOMEM;
 	}
+	//liqiang@wind-mobi.com 20171225 begin
+ 	g_fg_chip = chip; 
+	//liqiang@wind-mobi.com 20171025 end
 
 	chip->spmi = spmi;
 	chip->dev = &(spmi->dev);
@@ -8918,6 +9298,26 @@ static int fg_probe(struct spmi_device *spmi)
 	memset(chip->batt_info, INT_MAX, sizeof(chip->batt_info));
 
 	schedule_work(&chip->init_work);
+#ifdef AGING_POWER_TEST
+	aging_power_test_proc_init();
+#endif
+#ifdef CONFIG_WIND_ASUS_BATTERY_LIFE_SUPPORT
+#ifdef CONFIG_WIND_ASUS_BATTERY_LIFE_RDWR_PROINFO
+		INIT_DELAYED_WORK(&batterylife_charging_polling_work, batterylife_charging_polling_work_handle);
+		schedule_delayed_work(&batterylife_charging_polling_work, msecs_to_jiffies(10000)); //20000
+#endif
+    {
+        int ret_sysfile = 0;
+        ret_sysfile = sysfs_create_group(&chip->dev->kobj, &Charging_batterylife_attr_group);
+        if (ret_sysfile) {
+            pr_info("%s:  line=%d, sysfs_create_group failed, ret_sysfile=%d\n", __func__, __LINE__, ret_sysfile);
+            return ret_sysfile;
+        }
+    }
+#endif
+#ifdef SWITCH_BATTERY_NAME
+    switch_battery_register();
+#endif
 
 	pr_info("FG Probe success - FG Revision DIG:%d.%d ANA:%d.%d PMIC subtype=%d\n",
 		chip->revision[DIG_MAJOR], chip->revision[DIG_MINOR],
