@@ -860,6 +860,8 @@ static int qpnp_wled_set(struct qpnp_led_data *led)
 	return 0;
 }
 
+static bool greenBlinking = false;
+
 static int qpnp_mpp_set(struct qpnp_led_data *led)
 {
 	int rc;
@@ -906,7 +908,9 @@ static int qpnp_mpp_set(struct qpnp_led_data *led)
 		if (led->mpp_cfg->pwm_mode == PWM_MODE) {
 			/*config pwm for brightness scaling*/
 			period_us = led->mpp_cfg->pwm_cfg->pwm_period_us;
-			if (period_us > INT_MAX / NSEC_PER_USEC) {
+			if (greenBlinking)
+				period_us = 2000000;	//2.5s
+			if (period_us > INT_MAX / NSEC_PER_USEC) {	//2147483
 				duty_us = (period_us * led->cdev.brightness) /
 					LED_FULL;
 				rc = pwm_config_us(
@@ -921,6 +925,7 @@ static int qpnp_mpp_set(struct qpnp_led_data *led)
 					duty_ns,
 					period_us * NSEC_PER_USEC);
 			}
+			dev_warn(&led->spmi_dev->dev, "wangs: (%ld) period_us=%d, duty_us=%d, duty_ns=%d\n", (INT_MAX / NSEC_PER_USEC), period_us, duty_us, duty_ns);
 			if (rc < 0) {
 				dev_err(&led->spmi_dev->dev, "Failed to " \
 					"configure pwm for new values\n");
@@ -1810,6 +1815,8 @@ static void qpnp_led_set(struct led_classdev *led_cdev,
 	if (value > led->cdev.max_brightness)
 		value = led->cdev.max_brightness;
 
+	greenBlinking = false;
+
 	led->cdev.brightness = value;
 	if (led->in_order_command_processing)
 		queue_work(led->workqueue, &led->work);
@@ -2612,6 +2619,7 @@ restore:
 static void led_blink(struct qpnp_led_data *led,
 			struct pwm_config_data *pwm_cfg)
 {
+#if 0
 	int rc;
 
 	flush_work(&led->work);
@@ -2654,6 +2662,16 @@ static void led_blink(struct qpnp_led_data *led,
 		}
 	}
 	mutex_unlock(&led->lock);
+#else
+	led->cdev.brightness = greenBlinking ? 51 : 0;
+	dev_warn(&led->spmi_dev->dev, "wangs: id=%d, brightness=%d\n", led->id, led->cdev.brightness);
+
+	//qpnp_led_set(&led->cdev, led->cdev.brightness);
+	if (led->in_order_command_processing)
+		queue_work(led->workqueue, &led->work);
+	else
+		schedule_work(&led->work);
+#endif
 }
 
 static ssize_t blink_store(struct device *dev,
@@ -2673,6 +2691,7 @@ static ssize_t blink_store(struct device *dev,
 
 	switch (led->id) {
 	case QPNP_ID_LED_MPP:
+		greenBlinking = blinking ? true : false;
 		led_blink(led, led->mpp_cfg->pwm_cfg);
 		break;
 	case QPNP_ID_RGB_RED:
@@ -3549,7 +3568,7 @@ static int qpnp_get_config_pwm(struct pwm_config_data *pwm_cfg,
 	return 0;
 
 bad_lpg_params:
-	pwm_cfg->use_blink = false;
+	pwm_cfg->use_blink = true;
 	if (pwm_cfg->mode == PWM_MODE) {
 		dev_err(&spmi_dev->dev, "LPG parameters not set for" \
 			" blink mode, defaulting to PWM mode\n");

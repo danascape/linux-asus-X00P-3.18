@@ -235,6 +235,21 @@ struct qpnp_pon {
 };
 
 static struct qpnp_pon *sys_reset_dev;
+//liqiang@wind-mobi.com 20171122 begin
+struct input_dev  *wind_diag_dev;
+
+
+void power_key_input(void)
+{
+	input_report_key(wind_diag_dev, KEY_POWER, 1);
+	input_sync(wind_diag_dev);
+	
+	input_report_key(wind_diag_dev, KEY_POWER, 0);
+	input_sync(wind_diag_dev);
+
+}
+
+//liqiang@wind-mobi.com 20171122 end
 static DEFINE_SPINLOCK(spon_list_slock);
 static LIST_HEAD(spon_dev_list);
 
@@ -822,6 +837,61 @@ static int qpnp_pon_store_and_clear_warm_reset(struct qpnp_pon *pon)
 	return 0;
 }
 
+/* lihaiyan@wind-mobi.com 20170908 begin for powerkey +++ */
+
+extern bool boot_after_60sec;
+//static int kpdpwr_key_cnt = 0;
+
+struct qpnp_pon *pon_bak = NULL;
+//#define PON_INT_RT_STS			0x10
+static struct qpnp_pon *pon_for_powerkey;
+static bool is_holding_power_key(void)
+{
+	int rc;
+	u8 pon_rt_sts = 0;
+	struct qpnp_pon *pon = pon_for_powerkey;
+
+	if (pon_for_powerkey == NULL) {
+		printk("%s: Error:pon_for_powerkey is NULL\n", __func__);
+		return false;
+	}
+	/* check the RT status to get the current status of the line */
+	rc = spmi_ext_register_readl(pon->spmi->ctrl, pon->spmi->sid,
+				QPNP_PON_RT_STS(pon), &pon_rt_sts, 1);
+	if (rc) {
+		dev_err(&pon->spmi->dev, "Failed to read PON RT status\n");
+		return false;
+	}
+
+	return pon_rt_sts & 1;
+}
+
+#include <linux/timer.h>
+#include <linux/reboot.h>
+#include <linux/syscalls.h>
+#include <linux/workqueue.h>
+
+struct timer_list detect_pwrkey_timer;
+
+static void kernel_restart_work_fn(struct work_struct *work)
+{
+	//printk("[wind-tick][kpdpwr]long press pwk, start to restar system \n");
+	if (is_holding_power_key()){
+		kernel_restart(NULL);
+	}
+}
+
+static DECLARE_WORK( kernel_restart_work, kernel_restart_work_fn);
+
+static void detect_pwrkey_timer_func(unsigned long data)
+{
+	if(!work_pending(&kernel_restart_work) && is_holding_power_key()){
+		printk("[wind-tick][kpdpwr]long press pwk, start to restar system \n");
+		schedule_work(&kernel_restart_work);
+	}
+}
+/* lihaiyan@wind-mobi.com 20170908 end for powerkey +++ */
+
 static int
 qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 {
@@ -862,6 +932,25 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 	switch (cfg->pon_type) {
 	case PON_KPDPWR:
 		pon_rt_bit = QPNP_PON_KPDPWR_N_SET;
+/* liuxiong@wind-mobi.com 20181017 begin for powerkey ---*/
+		printk("[yukai][qpnp-power-on] PON_KPDPWR!!! keycode=%d, state=%d \n",cfg->key_code,(pon_rt_sts & pon_rt_bit));
+		/* for phone hang debug */
+		pon_for_powerkey = pon;
+		if(boot_after_60sec){
+			if (is_holding_power_key()) {
+				printk("[wind-tick][kpdpwr] start add timer\n");
+				detect_pwrkey_timer.expires = jiffies + 6*HZ;
+				detect_pwrkey_timer.function = detect_pwrkey_timer_func;
+				detect_pwrkey_timer.data = 0UL;
+				if(timer_pending(&detect_pwrkey_timer))
+					del_timer(&detect_pwrkey_timer);
+				add_timer(&detect_pwrkey_timer);
+			}else{
+				printk("[wind-tick][kpdpwr] start del timer\n");
+				del_timer(&detect_pwrkey_timer);
+			}
+		}
+/* liuxiong@wind-mobi.com 20181017 end for powerkey ---*/
 		break;
 	case PON_RESIN:
 		pon_rt_bit = QPNP_PON_RESIN_N_SET;
@@ -1301,6 +1390,11 @@ qpnp_pon_config_input(struct qpnp_pon *pon,  struct qpnp_pon_config *cfg)
 	/* don't send dummy release event when system resumes */
 	__set_bit(INPUT_PROP_NO_DUMMY_RELEASE, pon->pon_input->propbit);
 	input_set_capability(pon->pon_input, EV_KEY, cfg->key_code);
+	
+	//liqiang@wind-mobi.com 20171122 begin
+	wind_diag_dev = pon->pon_input;
+	
+	//liqiang@wind-mobi.com 20171122 end
 
 	return 0;
 }
@@ -2294,6 +2388,7 @@ static int qpnp_pon_probe(struct spmi_device *spmi)
 	dev_set_drvdata(&spmi->dev, pon);
 
 	INIT_DELAYED_WORK(&pon->bark_work, bark_work_func);
+	init_timer(&detect_pwrkey_timer);//liuxiong@wind-mobi.com 20181017
 
 	/* register the PON configurations */
 	rc = qpnp_pon_config_init(pon);

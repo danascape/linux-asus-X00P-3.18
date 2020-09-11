@@ -20,6 +20,19 @@
 #include <linux/batterydata-lib.h>
 #include <linux/power_supply.h>
 
+typedef struct battery_info {
+    char BAT_Model_Name[9];
+    char Battery_type[2] ;
+    unsigned int g_bat_id;
+    unsigned int Driver_and_Data_Flash_Version;
+    char Image_Version[50];
+} battery_info_t;
+battery_info_t battery_info_data;
+
+char g_switch_battery_info[100];
+
+int Current_battery_mA = 0;
+
 static int of_batterydata_read_lut(const struct device_node *np,
 			int max_cols, int max_rows, int *ncols, int *nrows,
 			int *col_legend_data, int *row_legend_data,
@@ -336,6 +349,41 @@ struct device_node *of_batterydata_get_best_profile(
 	}
 
 	batt_id_kohm = ret.intval / 1000;
+	pr_info("wangs: real battery id=%d\n", batt_id_kohm);
+
+	if (9 <= batt_id_kohm && batt_id_kohm <=10) {
+		pr_info("wangs: power test use FAKE battery !\n");
+		batt_id_kohm = 50;
+	}
+
+    {
+        memset(g_switch_battery_info, 0, sizeof(g_switch_battery_info));
+
+#ifdef CONFIG_WIND_PRO_A306
+        if (batt_id_kohm >= 45 && batt_id_kohm <= 55) {
+            sprintf(battery_info_data.BAT_Model_Name, "%s", "C11P1709");
+            sprintf(battery_info_data.Battery_type, "%s", "O");
+            battery_info_data.g_bat_id = 01;
+            battery_info_data.Driver_and_Data_Flash_Version = 1;
+            sprintf(battery_info_data.Image_Version, "%s", "15.00.1712.0");
+        }
+#else
+        if (batt_id_kohm >= 45 && batt_id_kohm <= 55) {
+            sprintf(battery_info_data.BAT_Model_Name, "%s", "C11P1707");
+            sprintf(battery_info_data.Battery_type, "%s", "O");
+            battery_info_data.g_bat_id = 01;
+            battery_info_data.Driver_and_Data_Flash_Version = 1;
+            sprintf(battery_info_data.Image_Version, "%s", "14.00.1801.11");
+        }
+        else if (batt_id_kohm >= 95 && batt_id_kohm <= 105) {
+            sprintf(battery_info_data.BAT_Model_Name, "%s", "C11P1707");
+            sprintf(battery_info_data.Battery_type, "%s", "T");
+            battery_info_data.g_bat_id = 03;
+            battery_info_data.Driver_and_Data_Flash_Version = 1;
+            sprintf(battery_info_data.Image_Version, "%s", "14.00.1709.1");
+        }
+#endif
+    }
 
 	/* read battery id range percentage for best profile */
 	rc = of_property_read_u32(batterydata_container_node,
@@ -406,6 +454,17 @@ struct device_node *of_batterydata_get_best_profile(
 		pr_info("%s found\n", battery_type);
 	else
 		pr_info("%s found\n", best_node->name);
+
+	sprintf(g_switch_battery_info, "%s-%s-0%x-000%d-%s", battery_info_data.BAT_Model_Name,
+		battery_info_data.Battery_type, battery_info_data.g_bat_id,
+		battery_info_data.Driver_and_Data_Flash_Version,
+		battery_info_data.Image_Version);
+
+	rc = of_property_read_u32(best_node, "qcom,nom-batt-capacity-mah",
+					&Current_battery_mA);
+	if (rc) {
+		pr_err("Error reading qcom,nom-batt-capacity-mah property rc=%d\n", rc);
+	}
 
 	return best_node;
 }

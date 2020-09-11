@@ -2809,6 +2809,29 @@ static struct thermal_zone_device_ops qpnp_adc_tm_thermal_ops = {
 	.set_trip_temp = qpnp_adc_tm_set_trip_temp,
 };
 
+extern struct thermal_zone_device *pcb_tz_asus;
+
+int fake_pcbtemperature = 66666;
+int asus_thermal_get_temp(struct thermal_zone_device *thermal)
+{
+    int ret = 0;
+    long temperature = 0;
+
+    if (thermal) {
+        ret = thermal->ops->get_temp(thermal, &temperature);
+        if (ret < 0) {
+            pr_err("asus_thermal_get_temp error!\n");
+            return ret;
+        }
+    }
+    if ((!strcmp(thermal->type, "csae_therm")) && (66666 != fake_pcbtemperature)) {
+        return fake_pcbtemperature;
+    }
+
+    pr_info("wind-log: asus_thermal_get_temp temperature=%ld\n", temperature);//asus_get_temp
+    return temperature * 1000;
+}
+
 int32_t qpnp_adc_tm_channel_measure(struct qpnp_adc_tm_chip *chip,
 					struct qpnp_adc_tm_btm_param *param)
 {
