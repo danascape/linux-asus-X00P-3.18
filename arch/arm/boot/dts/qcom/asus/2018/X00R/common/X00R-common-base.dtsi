@@ -1,0 +1,26 @@
+/*
+ * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/* X00R = msm89x7 */
+
+#include "msm8937-mdss-panels.dtsi"
+#include "msm-pm8937.dtsi"
+#include "msm-pmi8940.dtsi"
+#include "X00R.dtsi"
+#include "X00R-audio.dtsi"
+#include "X00R-camera.dtsi"
+#include "X00R-camera-pinctrl.dtsi"
+#include "X00R-camera-sensor-mtp.dtsi"
+#include "X00R-mtp.dtsi"
+#include "X00R-pinctrl.dtsi"
+#include "X00R-pmi8940-mtp.dtsi"

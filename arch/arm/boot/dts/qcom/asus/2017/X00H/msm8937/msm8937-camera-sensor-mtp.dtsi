@@ -1,0 +1,38 @@
+/*
+ * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&eeprom0 {
+	cam_vdig-supply = <&pm8937_l23>;
+};
+
+&eeprom1 {
+	cam_vdig-supply = <&pm8937_l23>;
+};
+
+&eeprom2 {
+	cam_vdig-supply = <&pm8937_l23>;
+};
+
+&cci {
+	qcom,camera@0 {
+		cam_vdig-supply = <&pm8937_l23>;
+	};
+
+	qcom,camera@1 {
+		cam_vdig-supply = <&pm8937_l23>;
+	};
+
+	qcom,camera@2 {
+		cam_vdig-supply = <&pm8937_l23>;
+	};
+};

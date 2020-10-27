@@ -1,0 +1,19 @@
+/*
+ * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/* Asus common dtsi */
+#include "common/common-base.dtsi"
+/* Asus X00R common dtsi */
+#include "2018/X00R/common/X00R-common-base.dtsi"
+/* Asus X00R msm8937 dtsi */
+#include "2018/X00R/msm8937/X00R-msm8937-base.dtsi"

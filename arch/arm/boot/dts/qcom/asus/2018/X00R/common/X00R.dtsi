@@ -1,0 +1,38 @@
+/*
+ * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&firmware {
+	android {
+		fstab {
+			compatible = "android,fstab";
+			vendor {
+				fsmgr_flags = "wait";
+			};
+		};
+	};
+};
+
+&usb_otg {
+	qcom,hsusb-otg-phy-init-seq = <0x44 0x80 0x6B 0x81 0x33 0x82 0x33 0x83 0xffffffff>;
+};
+
+&soc {
+	qcom,msm-imem@8600000 {
+		/delete-node/ dload_type@1c;
+
+		dload_type@18 {
+			compatible = "qcom,msm-imem-dload-type";
+			reg = <0x18 4>;
+		};
+	};
+};

@@ -1,0 +1,31 @@
+/*
+ * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&soc {
+	focal_fp {
+		vdd-supply = <&pm8917_l10>;
+	};
+};
+
+&pmi_haptic {
+	/delete-property/ qcom,lra-auto-res-mode;
+	/delete-property/ qcom,lra-high-z;
+	/delete-property/ qcom,lra-res-cal-period;
+
+	status = "ok";
+	qcom,actuator-type = "erm";
+};
+
+&mdss_dsi0 {
+	qcom,dsi-pref-prim-pan = <&dsi_ili9881c_fhd_vid>;
+};

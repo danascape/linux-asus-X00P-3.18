@@ -1,0 +1,64 @@
+/*
+ * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&mdss_dsi_active {
+	mux {
+		pins = "gpio60", "gpio45", "gpio46";
+	};
+
+	config {
+		pins = "gpio60", "gpio45", "gpio46";
+	};
+};
+
+&mdss_dsi_suspend {
+	mux {
+		pins = "gpio60", "gpio45", "gpio46";
+	};
+
+	config {
+		pins = "gpio60", "gpio45", "gpio46";
+	};
+};
+
+&pri_tlmm_ws_act {
+	mux {
+		pins = "gpio50";
+	};
+
+	config {
+		pins = "gpio50";
+	};
+};
+
+&pri_tlmm_ws_sus {
+	mux {
+		pins = "gpio50";
+	};
+
+	config {
+		pins = "gpio50";
+	};
+};
+
+&sdc2_cmd_on {
+	config {
+		drive-strength = <10>;
+	};
+};
+
+&sdc2_data_on {
+	config {
+		drive-strength = <10>;
+	};
+};

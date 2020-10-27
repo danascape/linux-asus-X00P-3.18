@@ -173,6 +173,12 @@ dtb-$(CONFIG_ARCH_SDX20) += sdx20-emmc-cdp.dtb \
 	sdx20-v2-emmc-pcie-ep-mtp.dtb \
 	sdx20-v2-nand-pcie-ep-mtp.dtb
 
+ifeq ($(CONFIG_MACH_ASUS),y)
+dtb-$(CONFIG_MACH_ASUS_X00H) += msm8937-pmi8940-mtp-X00H.dtb
+dtb-$(CONFIG_MACH_ASUS_X00I) += msm8937-pmi8950-mtp-X00I.dtb
+dtb-$(CONFIG_MACH_ASUS_X00P) += msm8937-pmi8940-mtp-X00P.dtb
+dtb-$(CONFIG_MACH_ASUS_X00R) += msm8937-pmi8940-mtp-X00R.dtb
+else
 dtb-$(CONFIG_ARCH_MSM8937) += msm8937-rumi.dtb \
 	msm8937-pmi8950-cdp.dtb \
 	msm8937-pmi8937-cdp.dtb \
@@ -192,7 +198,14 @@ dtb-$(CONFIG_ARCH_MSM8937) += msm8937-rumi.dtb \
 	apq8037-pmi8937-cdp.dtb \
 	apq8037-pmi8950-mtp.dtb \
 	apq8037-pmi8937-mtp.dtb
+endif
 
+ifeq ($(CONFIG_MACH_ASUS),y)
+dtb-$(CONFIG_MACH_ASUS_X00H) += msm8917-pmi8940-mtp-X00H.dtb
+dtb-$(CONFIG_MACH_ASUS_X00I) += msm8917-pmi8950-mtp-X00I.dtb
+dtb-$(CONFIG_MACH_ASUS_X00P) += msm8917-pmi8940-mtp-X00P.dtb
+dtb-$(CONFIG_MACH_ASUS_X00R) += msm8917-pmi8940-mtp-X00R.dtb
+else
 dtb-$(CONFIG_ARCH_MSM8917) += msm8917-rumi.dtb \
 	apq8017-pmi8937-cdp.dtb \
 	apq8017-pmi8937-mtp.dtb \
@@ -214,6 +227,7 @@ dtb-$(CONFIG_ARCH_MSM8917) += msm8917-rumi.dtb \
 	apq8017-pmi8937-cdp-wcd-rome.dtb \
 	apq8017-pmi8950-cdp-wcd-rome.dtb \
 	apq8017-no-pmi-wcd-rome-cdp.dtb
+endif
 
 dtb-$(CONFIG_ARCH_MSM8920) += msm8920-pmi8937-cdp.dtb \
 	msm8920-pmi8937-mtp.dtb \

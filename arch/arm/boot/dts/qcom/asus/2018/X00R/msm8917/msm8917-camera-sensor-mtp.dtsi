@@ -1,0 +1,72 @@
+/*
+ * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&actuator0 {
+	cam_vaf-supply = <&pm8917_l17>;
+};
+
+&actuator1 {
+	cam_vaf-supply = <&pm8917_l17>;
+};
+
+&eeprom0 {
+	cam_vdig-supply = <&pm8917_l23>;
+	cam_vana-supply = <&pm8917_l22>;
+	cam_vio-supply = <&pm8917_l6>;
+	cam_vaf-supply = <&pm8917_l17>;
+
+	pinctrl-0 = <&cam_sensor_mclk0_default &cam_sensor_rear_default
+				 &cam_sensor_rear_vdig>;
+	pinctrl-1 = <&cam_sensor_mclk0_sleep &cam_sensor_rear_sleep
+				 &cam_sensor_rear_vdig_sleep>;
+};
+
+&eeprom1 {
+	cam_vdig-supply = <&pm8917_l23>;
+	cam_vana-supply = <&pm8917_l22>;
+	cam_vio-supply = <&pm8917_l6>;
+};
+
+&eeprom2 {
+	cam_vdig-supply = <&pm8917_l23>;
+	cam_vana-supply = <&pm8917_l22>;
+	cam_vio-supply = <&pm8917_l6>;
+};
+
+&cci {
+	qcom,camera@0 {
+		cam_vdig-supply = <&pm8917_l23>;
+		cam_vana-supply = <&pm8917_l22>;
+		cam_vio-supply = <&pm8917_l6>;
+		cam_vaf-supply = <&pm8917_l17>;
+	};
+
+	qcom,camera@1 {
+		cam_vdig-supply = <&pm8917_l23>;
+		cam_vana-supply = <&pm8917_l22>;
+		cam_vio-supply = <&pm8917_l6>;
+	};
+
+	qcom,camera@2 {
+		cam_vdig-supply = <&pm8917_l23>;
+		cam_vana-supply = <&pm8917_l22>;
+		cam_vio-supply = <&pm8917_l6>;
+
+		qcom,gpio-req-tbl-label = "CAMIF_MCLK1",
+			"CAM_RESET1",
+			"CAM_STANDBY1",
+			"CAM_MIPIEN",
+			"CAM_MIPISEL",
+			"CAM_VDIG";
+	};
+};

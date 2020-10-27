@@ -1,0 +1,62 @@
+/*
+ * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+qcom,2974245_huaqin_ca456580gcos_4020mah_averaged_masterslave_jun29th2017 { 
+	/* #2974245_Huaqin_CA456580Gcos_4020mAh_averaged_MasterSlave_Jun29th2017*/ 
+	qcom,max-voltage-uv = <4380000>; 
+	qcom,nom-batt-capacity-mah = <4020>; 
+	qcom,batt-id-kohm = <51>; 
+	qcom,battery-beta = <3435>; 
+	qcom,battery-type = "C11P1609-O-01-0001-14.2016.1705.302"; 
+	qcom,thermal-coefficients = [C5 86 BE 50 D1 37]; 
+	qcom,chg-rslow-comp-c1 = <3869982>; 
+	qcom,chg-rslow-comp-c2 = <6737599>; 
+	qcom,chg-rs-to-rslow = <781852>; 
+	qcom,chg-rslow-comp-thr = <0xB7>; 
+	qcom,checksum = <0x00BA>; 
+	qcom,gui-version = "PMI8950GUI - 2.0.0.16"; 
+	qcom,fg-profile-data = [ 
+		 F9 83 AA 7D  
+		 99 81 1A 7C  
+		 5C 83 01 67  
+		 F2 82 8D 8D  
+		 59 82 2A 98  
+		 AA B5 29 C1  
+		 58 18 04 88  
+		 AB 7D 83 81  
+		 F1 77 5F 83  
+		 45 36 0C 82  
+		 9F 8D 42 82  
+		 13 9A 7D BD  
+		 BE CA 5A 0E  
+		 89 0F 06 5A  
+		 91 6F 29 FC  
+		 B3 29 22 45  
+		 3E 25 00 00  
+		 E2 46 45 24  
+		 27 40 00 00  
+		 00 00 00 00  
+		 00 00 00 00  
+		 5A 6B 9C 69  
+		 50 70 8C 89  
+		 F7 77 4A 71  
+		 51 63 E3 80  
+		 50 75 0C 6A  
+		 1A 6E 56 A2  
+		 29 A6 61 EF  
+		 5D A0 71 0C  
+		 28 00 FF 36  
+		 F0 11 30 03  
+		 00 00 00 0C  
+	]; 
+}; 

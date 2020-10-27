@@ -1,0 +1,70 @@
+/*
+ * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&soc {
+	goodix_fp {
+		compatible = "goodix,fingerprint";
+		input-device-name = "gf5216";
+		interrupt-parent = <&tlmm>;
+		interrupts = <1 0x0>;
+
+		goodix,gpio_reset    = <&tlmm 2 0>;
+		goodix,gpio_irq      = <&tlmm 1 0>;
+
+		pinctrl-names = "goodixfp_reset_reset",
+				"goodixfp_reset_active",
+				"goodixfp_irq_active";
+
+		pinctrl-0 = <&goodix_reset_reset>;
+		pinctrl-1 = <&goodix_reset_active>;
+		pinctrl-2 = <&goodix_irq_active>;
+	};
+
+    focal_fp {
+		compatible = "focal,fingerprint";
+		input-device-name = "qwerty";
+		interrupt-parent = <&tlmm>;
+		interrupts = <1 0x0>;
+
+		focal,gpio_reset    = <&tlmm 2 0>;
+		focal,gpio_irq      = <&tlmm 1 0>;
+
+		pinctrl-names = "focalfp_reset_out1",
+				"focalfp_reset_out0",
+				"focalfp_irq_active";
+
+		pinctrl-0 = <&focal_reset_out1>;
+		pinctrl-1 = <&focal_reset_out0>;
+		pinctrl-2 = <&focal_irq_active>;
+	};
+};
+
+&mdss_dsi0 {
+	qcom,regulator-ldo-mode;
+};
+
+&dsi_ili9885_fhd_vid {
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+};
+
+&dsi_ili9881c_fhd_vid {
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+};
+
+&dsi_hx8394f_720p_video {
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+};
+
+&sdhc_2 {
+	cd-gpios = <&tlmm 67 0x0>;
+};
