@@ -34,12 +34,6 @@
 
 #include "fpsensor_spi_tee.h"
 
-//zhangkaiyuan@wind-mobi.com 20171213 begin
-#ifdef CONFIG_WIND_DEVICE_INFO
-#include <../../wind_device_info/wind_device_info.h>
-#endif
-//zhangkaiyuan@wind-mobi.com 20171213 end
-
 #define FPSENSOR_SPI_VERSION        "fpsensor_spi_tee_v0.21"
 
 /*********************feature control*************************/
@@ -60,12 +54,6 @@
 #define FPSENSOR_NAV_LEFT_KEY   21 //KEY_LEFT
 #define FPSENSOR_NAV_RIGHT_KEY  22 //KEY_RIGHT
 #define FPSENSOR_NAV_TAP_KEY    23
-
-//zhangkaiyuan@wind-mobi.com 20171213 begin
-#ifdef CONFIG_WIND_DEVICE_INFO
-extern wind_device_info_t wind_device_info;
-#endif
-//zhangkaiyuan@wind-mobi.com 20171213 end
 
 /* debug log setting */
 static u8 fpsensor_debug_level = ERR_LOG;//DEBUG_LOG;zhangkaiyuan@wind-mobi.com 20180206
@@ -333,11 +321,6 @@ static long fpsensor_ioctl(struct file *filp, unsigned int cmd, unsigned long ar
     int retval = 0;
     unsigned int val = 0;
     int irqf;
-	//zhangkaiyuan@wind-mobi.com 20171213 begin
-	#ifdef CONFIG_WIND_DEVICE_INFO
-	lc_ic_info_t ic_info_data;
-	#endif
-	//zhangkaiyuan@wind-mobi.com 20171213 end
     //FUNC_ENTRY();
     fpsensor_debug(INFO_LOG, "[rickon]: fpsensor ioctl cmd : 0x%x \n", cmd );
     fpsensor_dev = (fpsensor_data_t *)filp->private_data;
@@ -457,22 +440,6 @@ static long fpsensor_ioctl(struct file *filp, unsigned int cmd, unsigned long ar
         retval = 0;
         break;
 #endif
-	/*zhangkaiyuan@wind-mobi.com 20171213 begin*/
-	    #ifdef CONFIG_WIND_DEVICE_INFO
-	    case FPSENSOR_IOC_GET_IC_INFO: {
-		if (copy_from_user(&ic_info_data, (lc_ic_info_t *)arg, sizeof(lc_ic_info_t))) {
-            //xprintk(KERN_ERR, "copy_from_user(..) failed.\n");
-            break;
-        }
-		sprintf(wind_device_info.fp_module_info.ic_name, "%s", ic_info_data.ic_name);
-		sprintf(wind_device_info.fp_module_info.fwvr, "%s", ic_info_data.fwvr);
-		wind_device_info.fp_module_info.vendor = ic_info_data.vendor; 
-		//xprintk(KERN_INFO, "ic_name = %s, fp_module_info.vendor = %02x, fp_module_info.fwvr = %s\n", 
-				//wind_device_info.fp_module_info.ic_name, wind_device_info.fp_module_info.vendor, wind_device_info.fp_module_info.fwvr);
-		break;
-	    }
-	    #endif
-	/*zhangkaiyuan@wind-mobi.com 20171213 end.*/
     default:
         fpsensor_debug(ERR_LOG, "fpsensor doesn't support this command(%d)\n", cmd);
         break;

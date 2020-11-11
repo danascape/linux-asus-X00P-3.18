@@ -164,16 +164,6 @@ typedef struct {
     int value; /* for key type, 0 means up, 1 means down. */
 } sf_key_event_t;
 
-//zhangkaiyuan@wind-mobi.com 20171213 begin
-#ifdef CONFIG_WIND_DEVICE_INFO
-typedef struct {
-    char ic_name[30];
-    unsigned int vendor; 
-	char fwvr[8]; 
-} sf_ic_info_t;
-#endif
-//zhangkaiyuan@wind-mobi.com 20171213 end
-
 #define SF_MAX_VER_INFO_LEN 32
 
 typedef struct {
@@ -225,11 +215,6 @@ typedef struct {
 
 /* Query the driver version string. */
 #define SF_IOC_GET_VERSION      _IOR(SF_IOC_MAGIC, 0x20, const char *)
-//zhangkaiyuan@wind-mobi.com 20171213 begin
-#ifdef CONFIG_WIND_DEVICE_INFO
-#define SF_IOC_SET_IC_INFO      _IOR(SF_IOC_MAGIC, 0x30, sf_ic_info_t *)
-#endif
-//zhangkaiyuan@wind-mobi.com 20171213 end
 /* sunwave hal lib version info set&get. */
 #define SF_IOC_SET_LIB_VERSION  _IO(SF_IOC_MAGIC, 0x30)
 #define SF_IOC_GET_LIB_VERSION  _IO(SF_IOC_MAGIC, 0x31)

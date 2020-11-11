@@ -7,11 +7,6 @@
  * Contact: guq@microarray.com.cn
  */
 #include "madev.h"
-//zhangkaiyuan@wind-mobi.com 20171213 begin
-#ifdef CONFIG_WIND_DEVICE_INFO
-#include <../../wind_device_info/wind_device_info.h>
-#endif
-//zhangkaiyuan@wind-mobi.com 20171213 end
 
 
 
@@ -47,12 +42,6 @@ static struct fprint_spi *smas = NULL;
 
 static u8 stxb[FBUF];
 static u8 srxb[FBUF];
-
-//zhangkaiyuan@wind-mobi.com 20171213 begin
-#ifdef CONFIG_WIND_DEVICE_INFO
-extern wind_device_info_t wind_device_info;
-#endif
-//zhangkaiyuan@wind-mobi.com 20171213 end
 
 
 
@@ -170,11 +159,6 @@ static int mas_free_all(void);
 static long mas_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
     //MALOGF("start");
 	int tmp;
-     //zhangkaiyuan@wind-mobi.com 20171213 begin
-     #ifdef CONFIG_WIND_DEVICE_INFO
-     ma_ic_info_t ic_info_data;
-     #endif
-     //zhangkaiyuan@wind-mobi.com 20171213 end
 
     switch(cmd){
         case TIMEOUT_WAKELOCK:                                                       //延时锁    timeout lock
@@ -350,20 +334,6 @@ static long mas_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
             mutex_unlock(&ioctl_lock);   
             mas_free_all();
             break;
-	/*zhangkaiyuan@wind-mobi.com 20171213 begin*/
-         #ifdef CONFIG_WIND_DEVICE_INFO
-	    case SET_IC_INFO:
-	         mutex_lock(&ioctl_lock);
-             ret = copy_from_user(&ic_info_data, (ma_ic_info_t *)arg, sizeof(ma_ic_info_t));
-			 mutex_unlock(&ioctl_lock);
-             sprintf(wind_device_info.fp_module_info.ic_name, "%s", ic_info_data.ic_name);
-             sprintf(wind_device_info.fp_module_info.fwvr, "%s", ic_info_data.fwvr);
-             wind_device_info.fp_module_info.vendor = ic_info_data.vendor;
-             //xprintk(KERN_INFO, "ic_name = %s, fp_module_info.vendor = %02x, fp_module_info.fwvr = %s\n",
-                 //wind_device_info.fp_module_info.ic_name, wind_device_info.fp_module_info.vendor, wind_device_info.fp_module_info.fwvr);
-             break;
-         #endif
-     /*zhangkaiyuan@wind-mobi.com 20171213 end.*/
 
         default:
             ret = -EINVAL;

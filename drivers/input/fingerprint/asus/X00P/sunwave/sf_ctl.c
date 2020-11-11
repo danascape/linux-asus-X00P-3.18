@@ -36,11 +36,6 @@
 #if SF_INT_TRIG_HIGH
 #include <linux/irq.h>
 #endif
-//zhangkaiyuan@wind-mobi.com 20171213 begin
-#ifdef CONFIG_WIND_DEVICE_INFO
-#include <../../wind_device_info/wind_device_info.h>
-#endif
-//zhangkaiyuan@wind-mobi.com 20171213 end
 #ifdef CONFIG_RSEE
 #include <linux/tee_drv.h>
 #endif
@@ -73,10 +68,6 @@ static ssize_t sf_ctl_write(struct file *filp, const char __user *buf, size_t co
 #endif
 #if (SF_PROBE_ID_EN && !SF_RONGCARD_COMPATIBLE)
 static int sf_read_sensor_id(void);
-#endif
-//zhangkaiyuan@wind-mobi.com 20171213 begin
-#ifdef CONFIG_WIND_DEVICE_INFO
-extern wind_device_info_t wind_device_info;
 #endif
 
 extern int sf_platform_init(struct sf_ctl_device *ctl_dev);
@@ -354,11 +345,6 @@ static long sf_ctl_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
     int err = 0;
     sf_key_event_t kevent;
-	//zhangkaiyuan@wind-mobi.com 20171213 begin
-	#ifdef CONFIG_WIND_DEVICE_INFO
-	sf_ic_info_t ic_info_data;
-	#endif
-	//zhangkaiyuan@wind-mobi.com 20171213 end
     xprintk(SF_LOG_LEVEL, "%s(_IO(type,nr) nr= 0x%08x, ..)\n", __FUNCTION__, _IOC_NR(cmd));
 
     switch (cmd) {
@@ -463,23 +449,6 @@ static long sf_ctl_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
             break;
         }
-	/*zhangkaiyuan@wind-mobi.com 20171213 begin*/
-	    #ifdef CONFIG_WIND_DEVICE_INFO
-	    case SF_IOC_SET_IC_INFO: {
-		if (copy_from_user(&ic_info_data, (sf_ic_info_t *)arg, sizeof(sf_ic_info_t))) {
-            xprintk(KERN_ERR, "copy_from_user(..) failed.\n");
-            err = (-EFAULT);
-            break;
-        }
-		sprintf(wind_device_info.fp_module_info.ic_name, "%s", ic_info_data.ic_name);
-		sprintf(wind_device_info.fp_module_info.fwvr, "%s", ic_info_data.fwvr);
-		wind_device_info.fp_module_info.vendor = ic_info_data.vendor; 
-		xprintk(KERN_INFO, "ic_name = %s, fp_module_info.vendor = %02x, fp_module_info.fwvr = %s\n", 
-				wind_device_info.fp_module_info.ic_name, wind_device_info.fp_module_info.vendor, wind_device_info.fp_module_info.fwvr);
-		break;
-	    }
-	    #endif
-	/*zhangkaiyuan@wind-mobi.com 20171213 end.*/
         case SF_IOC_SET_LIB_VERSION: {
             if (copy_from_user((void *)&sf_hw_ver, (void *)arg, sizeof(sf_version_info_t))) {
                 xprintk(KERN_ERR, "sf_hw_info_t copy_from_user(..) failed.\n");
@@ -1110,7 +1079,7 @@ static int sf_read_sensor_id(void)
 
             do {
                 sf_ctl_dev.reset();
-                /* reset ½ÅÀ­¸ßºó£¬ÐèÔÚ 6ms~26ms ÄÚ¶Á ID£¬Ð¡ÓÚ 6ms »òÕß³¬¹ý 26ms ¶¼¶Á²»µ½ ID */
+                /* reset ï¿½ï¿½ï¿½ï¿½ï¿½ßºï¿½ï¿½ï¿½ï¿½ï¿½ 6ms~26ms ï¿½Ú¶ï¿½ IDï¿½ï¿½Ð¡ï¿½ï¿½ 6ms ï¿½ï¿½ï¿½ß³ï¿½ï¿½ï¿½ 26ms ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ID */
                 msleep(1 + retry_8201 * 2);
                 memset(readbuf,  0, sizeof(readbuf));
                 memset(writebuf, 0, sizeof(writebuf));
@@ -1265,7 +1234,7 @@ static int __init sf_ctl_driver_init(void)
 
 #endif
 #if SF_SPI_RW_EN
-    /**register SPI device¡¢driver***/
+    /**register SPI deviceï¿½ï¿½driver***/
     spi_register_board_info(spi_board_devs, ARRAY_SIZE(spi_board_devs));
     err = spi_register_driver(&sf_driver);
 

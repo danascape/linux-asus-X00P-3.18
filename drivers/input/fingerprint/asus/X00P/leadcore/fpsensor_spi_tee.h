@@ -51,16 +51,6 @@ struct fpsensor_key {
     uint32_t value;   /* key down = 1, key up = 0 */
 };
 
-//zhangkaiyuan@wind-mobi.com 20171213 begin
-#ifdef CONFIG_WIND_DEVICE_INFO
-typedef struct {
-    char ic_name[30];
-    unsigned int vendor; 
-	char fwvr[8]; 
-} lc_ic_info_t;
-#endif
-//zhangkaiyuan@wind-mobi.com 20171213 end
-
 /* define commands */
 #define FPSENSOR_IOC_INIT                       _IOWR(FPSENSOR_IOC_MAGIC,0,unsigned int)
 #define FPSENSOR_IOC_EXIT                       _IOWR(FPSENSOR_IOC_MAGIC,1,unsigned int)
@@ -78,12 +68,6 @@ typedef struct {
 #define FPSENSOR_IOC_REMOVE                     _IOWR(FPSENSOR_IOC_MAGIC,12,unsigned int)
 #define FPSENSOR_IOC_CANCEL_WAIT                _IOWR(FPSENSOR_IOC_MAGIC,13,unsigned int)
 #define FPSENSOR_IOC_GET_FP_STATUS              _IOWR(FPSENSOR_IOC_MAGIC,19,unsigned int*)
-
-//zhangkaiyuan@wind-mobi.com 20171213 begin
-#ifdef CONFIG_WIND_DEVICE_INFO
-#define FPSENSOR_IOC_GET_IC_INFO      _IOWR(FPSENSOR_IOC_MAGIC, 0x30, lc_ic_info_t *)
-#endif
-//zhangkaiyuan@wind-mobi.com 20171213 end
 
 #define FPSENSOR_IOC_MAXNR    24  /* THIS MACRO IS NOT USED NOW... */
 
