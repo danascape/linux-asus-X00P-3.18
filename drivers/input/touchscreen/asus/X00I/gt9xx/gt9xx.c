@@ -19,7 +19,6 @@
  */
 
 #include <linux/irq.h>
-#include <linux/hqsysfs.h>
 #include <linux/switch.h>
 #include "gt9xx.h"
 
@@ -1664,12 +1663,10 @@ static s32 gtp_init_panel(struct goodix_ts_data *ts)
 	if (sensor_id == 0){//ofilm
 	snprintf(hw_info, 40, "gt9110P Ofilm Config_Version:%d,0x%02x", config[GTP_ADDR_LENGTH], config[GTP_ADDR_LENGTH]);
 	printk("%s\n",hw_info);
-	hq_regiser_hw_info(HWID_CTP,hw_info);
 	}
 	else if (sensor_id == 2){//avc
 	snprintf(hw_info, 40, "gt9110P avc Config_Version:%d,0x%02x", config[GTP_ADDR_LENGTH],config[GTP_ADDR_LENGTH]);
 	hw_info[35] = '\0';
-	hq_regiser_hw_info(HWID_CTP,hw_info);
 	}//add hw info for CTP by wangminyi 2016-10-27
 
 
