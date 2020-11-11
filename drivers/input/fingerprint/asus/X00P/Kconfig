@@ -1,0 +1,7 @@
+if MACH_ASUS_X00P
+
+source "drivers/input/fingerprint/asus/X00P/leadcore/Kconfig"
+source "drivers/input/fingerprint/asus/X00P/microarray/Kconfig"
+source "drivers/input/fingerprint/asus/X00P/sunwave/Kconfig"
+
+endif

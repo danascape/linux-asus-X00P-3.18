@@ -1,0 +1,6 @@
+config GOODIX_FP
+	bool "GOODIX_FP for Qualcomm package"
+	help
+	  Say Y here if you have a goodix fingerprint.
+
+          If unsure, say N.

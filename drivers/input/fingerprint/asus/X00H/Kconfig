@@ -1,0 +1,7 @@
+if MACH_ASUS_X00H
+
+source "drivers/input/fingerprint/asus/X00H/cdfinger_fp/Kconfig"
+source "drivers/input/fingerprint/asus/X00H/common/Kconfig"
+source "drivers/input/fingerprint/asus/X00H/goodix_fp/Kconfig"
+
+endif

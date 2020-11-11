@@ -1,0 +1,6 @@
+config FINGERPRINT_FOCALTECH_FT9338
+	bool "FINGERPRINT_FOCALTECH_FT9338 for Qualcomm package"
+	help
+	  Say Y here if you have a focaltech fingerprint.
+
+          If unsure, say N.

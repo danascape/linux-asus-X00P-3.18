@@ -1,0 +1,6 @@
+if MACH_ASUS_X00I
+
+source "drivers/input/fingerprint/asus/X00I/focaltech/Kconfig"
+source "drivers/input/fingerprint/asus/X00I/goodix_fp/Kconfig"
+
+endif
