@@ -1,0 +1,7 @@
+if MACH_ASUS_X00H
+
+source "drivers/input/touchscreen/asus/X00H/ft5436/Kconfig"
+source "drivers/input/touchscreen/asus/X00H/gt9xx/Kconfig"
+source "drivers/input/touchscreen/asus/X00H/hx852xes/Kconfig"
+
+endif

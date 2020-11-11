@@ -1,0 +1,20 @@
+#
+# MASTAR Touchscreen driver configuration
+#
+
+config TOUCHSCREEN_MASTAR_A306
+	bool "Mastar TP Msg2836"
+	depends on I2C
+	help
+	  Say Y here if you have a Msg2836 touchscreen.
+	  MASTAR controllers are multi touch controllers which can
+	  report 10 touches at a time.
+	  If unsure, say N.
+
+# zhaopengfei@wind-mobi.com 20180713 begin
+
+config TOUCHSCREEN_MSG2836
+        tristate "MSG2836 chipset touchscreen"
+		depends on I2C
+		help
+		This enables support for MSG2836 CHIPSET over I2C based touchscreens.

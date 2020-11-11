@@ -1125,4 +1125,6 @@ config TOUCHSCREEN_MAXIM_STI
 	  To compile this driver as a module, choose M here: the
 	  module will be called maxim_sti.
 
+source "drivers/input/touchscreen/asus/Kconfig"
+
 endif

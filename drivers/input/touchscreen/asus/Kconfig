@@ -1,0 +1,8 @@
+if MACH_ASUS
+
+source "drivers/input/touchscreen/asus/X00H/Kconfig"
+source "drivers/input/touchscreen/asus/X00I/Kconfig"
+source "drivers/input/touchscreen/asus/X00P/Kconfig"
+source "drivers/input/touchscreen/asus/X00R/Kconfig"
+
+endif

@@ -1,0 +1,9 @@
+if MACH_ASUS_X00R
+
+source "drivers/input/touchscreen/asus/X00R/ft5346i/Kconfig"
+source "drivers/input/touchscreen/asus/X00R/gt917d/Kconfig"
+source "drivers/input/touchscreen/asus/X00R/hx83102_A306/Kconfig"
+source "drivers/input/touchscreen/asus/X00R/HX852xES_A306/Kconfig"
+source "drivers/input/touchscreen/asus/X00R/Mastar_TP/Kconfig"
+
+endif
