@@ -242,6 +242,10 @@ enum msm_camera_i2c_operation {
 	MSM_CAM_WRITE = 0,
 	MSM_CAM_POLL,
 	MSM_CAM_READ,
+	#ifdef CONFIG_MACH_ASUS_2018
+	MSM_CAM_READ_GC5005,
+	MSM_CAM_READ_LOOP,
+	#endif
 };
 
 struct msm_sensor_i2c_sync_params {
