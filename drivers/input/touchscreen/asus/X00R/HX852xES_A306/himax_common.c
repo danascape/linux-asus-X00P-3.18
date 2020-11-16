@@ -81,12 +81,6 @@ unsigned char BOE77_ST7730_HX8527[]=
 
 #endif
 //hongfan@wind-mobi 20180111 add
-//hongfan@wind-mobi 20180119 add
-#ifdef CONFIG_WIND_DEVICE_INFO
-#include "wind_device_info.h"
-extern wind_device_info_t wind_device_info;
-#endif
-//hongfan@wind-mobi 20180119 end
 #if defined(HX_SMART_WAKEUP)||defined(HX_HIGH_SENSE)||defined(HX_USB_DETECT_GLOBAL)
 extern void himax_resend_cmd_func(bool suspended);
 extern void himax_rst_cmd_recovery_func(bool suspended);
@@ -455,30 +449,6 @@ update_retry:
         ic_data->vendor_config_ver = g_i_CFG_VER;
         result = 1;//upgrade success
         I("%s: TP upgrade OK\n", __func__);
-
-// wangbing@wind-mobi.com 2018316 begin >>> [2/2] modify the HX852xES vendor id
-#ifdef CONFIG_WIND_DEVICE_INFO
-        {
-            sprintf(wind_device_info.ctp_module_info.ic_name, "%s", "HX852xES");
-            sprintf(wind_device_info.ctp_module_info.fwvr, "0x%x", ic_data->vendor_config_ver);
-            wind_device_info.ctp_module_info.vendor = 0x00;
-            paul(" upgrade lcm: %s", caPanelName);
-            if(!strcmp("st7703 720p video mode dsi panel", caPanelName)) {
-                wind_device_info.ctp_module_info.vendor = 0x01;
-            } else if(!strcmp("dsi_boe55_st7703_720p_video", caPanelName)) {
-                wind_device_info.ctp_module_info.vendor = 0x02;
-            } else if(!strcmp("dsi_boe66_st7703_720p_video", caPanelName)) {
-               wind_device_info.ctp_module_info.vendor = 0x06;
-               sprintf(wind_device_info.ctp_module_info.ic_name, "%s", "HX8527-E44-L");
-               sprintf(wind_device_info.ctp_module_info.fwvr, "0x%x", ic_data->vendor_config_ver);			
-      	    }else if(!strcmp("dsi_boe77_st7703_720p_video", caPanelName)) {
-               wind_device_info.ctp_module_info.vendor = 0x07;
-               sprintf(wind_device_info.ctp_module_info.ic_name, "%s", "HX8527-E44-L-BL");
-               sprintf(wind_device_info.ctp_module_info.fwvr, "0x%x", ic_data->vendor_config_ver);			
-        }
-        }
-#endif
-// wangbing@wind-mobi.com 2018316 end   <<< [2/2] modify the HX852xES vendor id
 
     }
 #ifdef HX_RST_PIN_FUNC
@@ -2169,30 +2139,6 @@ int himax_chip_common_probe(struct i2c_client *client, const struct i2c_device_i
         himax_int_enable(client->irq,0);
     }
 #endif
-
-// wangbing@wind-mobi.com 2018316 begin >>> [1/2] modify the HX852xES vendor id
-#ifdef CONFIG_WIND_DEVICE_INFO
-    {   
-        sprintf(wind_device_info.ctp_module_info.ic_name, "%s", "HX852xES");
-        sprintf(wind_device_info.ctp_module_info.fwvr, "0x%x", ic_data->vendor_config_ver);
-        wind_device_info.ctp_module_info.vendor = 0x00;
-        paul(" HX852xES LCM: %s", caPanelName);
-        if(!strcmp("st7703 720p video mode dsi panel", caPanelName)) {
-            wind_device_info.ctp_module_info.vendor = 0x01;
-        } else if(!strcmp("dsi_boe55_st7703_720p_video", caPanelName)) {
-            wind_device_info.ctp_module_info.vendor = 0x02;
-        }else if(!strcmp("dsi_boe66_st7703_720p_video", caPanelName)) {
-            wind_device_info.ctp_module_info.vendor = 0x06;
-            sprintf(wind_device_info.ctp_module_info.ic_name, "%s", "HX8527-E44-L");
-            sprintf(wind_device_info.ctp_module_info.fwvr, "0x%x", ic_data->vendor_config_ver);			
-        }else if(!strcmp("dsi_boe77_st7703_720p_video", caPanelName)) {
-            wind_device_info.ctp_module_info.vendor = 0x07;
-            sprintf(wind_device_info.ctp_module_info.ic_name, "%s", "HX8527-E44-L-BL");
-            sprintf(wind_device_info.ctp_module_info.fwvr, "0x%x", ic_data->vendor_config_ver);			
-        }
-    }
-#endif
-// wangbing@wind-mobi.com 2018316 end   <<< [1/2] modify the HX852xES vendor id
 
 // wangbing@wind-mobi.com 20180423 begin >>> [3/7] add tp probe flag
     tp_is_probe = 1;

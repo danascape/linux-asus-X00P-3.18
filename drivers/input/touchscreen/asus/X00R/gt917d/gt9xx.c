@@ -3546,53 +3546,6 @@ static int goodix_ts_probe(struct i2c_client *client, const struct i2c_device_id
 #if GTP_CREATE_WR_NODE
     init_wr_node(client);
 #endif
-//hebiao@wind-mobi.com 20171127 begin
-#ifdef CONFIG_WIND_DEVICE_INFO
-	{	
-			u8 cfg_version = 0;
-			u8  pid[8] = {0};		/* product id   */
-			u16 vid = 0;
-			u8  buf[16] = {0};
-			u8 sensor_id = 0;
-			//printk("test %s %d\n", __func__, __LINE__);
-			ret = gtp_i2c_read_dbl_check(ts->client, GTP_REG_SENSOR_ID, &sensor_id, 1);
-    		if (SUCCESS != ret)
-    		{
-        		printk("gtp read sensor_id failed\n");
-    		}
-				
-			ret = gtp_i2c_read_dbl_check(ts->client, GTP_REG_CONFIG_DATA, &cfg_version, 1);
-	    	if (ret != SUCCESS) {
-	        	printk("gtp read cfg_version failed\n");
-	    	}
-
-			ret = gtp_i2c_read_dbl_check(ts->client, 0x8140, &buf[2], 6);
-    		if (FAIL == ret)
-    		{
-        		printk("gtp read pid_vid failed\n");
-       
-   			}
-
-			memset(pid, 0, sizeof(pid));
-    		memcpy(pid, &buf[2], 4);
-			vid = buf[2+4] + (buf[2+5]<<8);
-			
-			sprintf(wind_device_info.ctp_module_info.ic_name, "%s", pid);
-			sprintf(wind_device_info.ctp_module_info.fwvr, "%04x", vid);
-			sprintf(&(wind_device_info.ctp_module_info.fwvr[4]), "-%02x", cfg_version);
-			wind_device_info.ctp_module_info.vendor = sensor_id;
-
-			//printk("test sensor_id=%d\n", sensor_id);
-			//printk("test update_msg.ic_fw_msg.pid=%s\n", pid);
-			//printk("test update_msg.ic_fw_msg.vid=%04x\n", vid);
-			//printk("test %s %d cfg_version=%02x\n", __func__, __LINE__, cfg_version);
-		
-	}
-		
-		//printk("test update_msg.ic_fw_msg.vid=%04x\n", update_msg.ic_fw_msg.vid);
-#endif
-//hebiao@wind-mobi.com 20171127 end	
-
 
 		 printk("gt917d probe end %s %d %d\n", __func__, __LINE__, ts->gtp_is_suspend);
 		

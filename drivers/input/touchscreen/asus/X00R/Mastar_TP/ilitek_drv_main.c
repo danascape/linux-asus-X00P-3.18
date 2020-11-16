@@ -43,13 +43,6 @@
 
 #include "new_mp_test/mp_common.h"
 
-// zhaoepngfei@wind-mobi.com 20180711 begin >>> [3/5] add the mastar device info
-#ifdef CONFIG_WIND_DEVICE_INFO
-#include "wind_device_info.h"
-extern wind_device_info_t wind_device_info;
-#endif
-// zhaoepngfei@wind-mobi.com 20180711 end   <<< [3/5] add the mastar device info
-
 /*=============================================================*/
 // VARIABLE DECLARATION
 /*=============================================================*/
@@ -15017,19 +15010,7 @@ s32 /*__devinit*/ MsDrvInterfaceTouchDeviceProbe(struct i2c_client *pClient, con
 	{
 		printk("*** ILITEK %s() Major = %d, Minor = %d, _gFwVersion = %s ***\n", __func__, nMajor, nMinor, _gFwVersion);
 	}
-	
-// zhaopengfei@wind-mobi.com 20180711 begin >>> [2/5] add the mastar device info
-
-#ifdef CONFIG_WIND_DEVICE_INFO
-		{
-			sprintf(wind_device_info.ctp_module_info.ic_name, "%s", "MSG2836A");
-			sprintf(wind_device_info.ctp_module_info.fwvr, "%03d.%03d",nMajor,nMinor);
-			//printk("ctp_module_info.fwvr = %s", _gFwVersion);
-			wind_device_info.ctp_module_info.vendor = 0x05;
-		}
-#endif
-
-// zhaopengfei@wind-mobi.com 20180711 end	<<< [2/5] add the mastar device info
+ 
 
 #ifdef CONFIG_UPDATE_FIRMWARE_BY_SW_ID
 	DBG(&g_I2cClient->dev, "*** %s() ***\n", __func__);

@@ -1,9 +1,5 @@
 #ccflags-y += -Wall
 
-# zhaopengfei@wind-mobi.com 20180711 begin >>> [1/5] add the mastar device info
-ccflags-y += -I$(srctree)/drivers/misc/wind_device_info/
-# zhaopengfei@wind-mobi.com 20180711 end   <<< [1/5] add the mastar device info
-	
 #ccflags-y += -I$(srctree)/drivers/input/touchscreen/mediatek/msg2xxx/
 #ccflags-y += -I$(srctree)/drivers/input/touchscreen/mediatek/
 #ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/

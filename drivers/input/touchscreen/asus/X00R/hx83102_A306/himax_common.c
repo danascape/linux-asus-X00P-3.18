@@ -16,13 +16,6 @@
 #include "himax_common.h"
 #include "himax_ic.h"
 
-// wangbing@wind-mobi.com 2018316 begin >>> [1/4] add the hx83102 device info
-#ifdef CONFIG_WIND_DEVICE_INFO
-#include "wind_device_info.h"
-extern wind_device_info_t wind_device_info;
-#endif
-// wangbing@wind-mobi.com 2018316 end   <<< [1/4] add the hx83102 device info
-
 #define SUPPORT_FINGER_DATA_CHECKSUM 0x0F
 #define TS_WAKE_LOCK_TIMEOUT		(2 * HZ)
 #define FRAME_COUNT 5
@@ -371,11 +364,6 @@ update_retry:
         hx83102_read_FW_ver(hx83102_ts->client);
         hx83102_touch_information(hx83102_ts->client);
         result = 1;//upgrade success
-// wangbing@wind-mobi.com 2018316 begin >>> [3/4] add the hx83102 device info
-#ifdef CONFIG_WIND_DEVICE_INFO
-        sprintf(wind_device_info.ctp_module_info.fwvr, "0x%x", hx83102_ic_data->vendor_config_ver);
-#endif
-// wangbing@wind-mobi.com 2018316 end   <<< [3/4] add the hx83102 device info
         I("%s: TP upgrade OK\n", __func__);
     }
 #ifdef HX_RST_PIN_FUNC
@@ -2070,16 +2058,6 @@ FW_force_upgrade:
         hx83102_int_enable(client->irq,0);
     }
 #endif
-
-// wangbing@wind-mobi.com 2018316 begin >>> [2/4] add the hx83102 device info
-#ifdef CONFIG_WIND_DEVICE_INFO
-    {
-        sprintf(wind_device_info.ctp_module_info.ic_name, "%s", "HX83102");
-        sprintf(wind_device_info.ctp_module_info.fwvr, "0x%x", hx83102_ic_data->vendor_config_ver);
-        wind_device_info.ctp_module_info.vendor = 0x03;
-    }
-#endif
-// wangbing@wind-mobi.com 2018316 end   <<< [2/4] add the hx83102 device info
 
 // wangbing@wind-mobi.com 20180423 begin >>> [3/7] add tp probe flag
     tp_is_probe = 1;

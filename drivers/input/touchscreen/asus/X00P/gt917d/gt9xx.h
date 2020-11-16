@@ -47,12 +47,6 @@
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
-//hebiao@wind-mobi.com 20171127 begin
-#ifdef CONFIG_WIND_DEVICE_INFO
-#include "wind_device_info.h"
-extern wind_device_info_t wind_device_info;
-#endif
-//hebiao@wind-mobi.com 20171127 end
 
 #define GTP_CONFIG_OF
 

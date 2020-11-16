@@ -37,13 +37,6 @@
 
 #include "ilitek_drv_common.h"
 
-// zhaopengfei@wind-mobi.com 20180711 begin >>> [5/5] add the mastar device info
-#ifdef CONFIG_WIND_DEVICE_INFO
-#include "wind_device_info.h"
-extern wind_device_info_t wind_device_info;
-#endif
-// zhaopengfei@wind-mobi.com 20180711 end   <<< [5/5] add the mastar device info
-
 
 /*=============================================================*/
 // VARIABLE DECLARATION
@@ -3794,15 +3787,6 @@ static void _DrvUpdateFirmwareBySwIdDoWork(struct work_struct *pWork)
     {
         DBG(&g_I2cClient->dev, "Update firmware by sw id success\n");
 		DrvGetCustomerFirmwareVersion(&nMajor, &nMinor, &_gFwVersion);
-// zhaopengfei@wind-mobi.com 20180720 begin >>> [4/5] add the mastar device info
-#ifdef CONFIG_WIND_DEVICE_INFO
-							{
-								sprintf(wind_device_info.ctp_module_info.ic_name, "%s", "MSG2836A");
-								sprintf(wind_device_info.ctp_module_info.fwvr, "%03d.%03d",nMajor,nMinor);
-								wind_device_info.ctp_module_info.vendor = 0x05;
-							}
-#endif
-// zhaopengfei@wind-mobi.com 20180720 end	<<< [4/5] add the mastar device info
 
         DrvTouchDeviceHwReset();
 

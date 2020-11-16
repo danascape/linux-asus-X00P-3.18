@@ -68,13 +68,6 @@ unsigned char LC_BOE66_ST7730_HX8527[]=
 
 #endif
 
-//hebiao@wind-mobi.com 20171127 begin
-#ifdef CONFIG_WIND_DEVICE_INFO
-//#include "wind_device_info.h"
-//extern wind_device_info_t wind_device_info;
-#endif
-//hebiao@wind-mobi.com 20171127 end
-
 #if defined(HX_SMART_WAKEUP)||defined(HX_HIGH_SENSE)||defined(HX_USB_DETECT_GLOBAL)
 extern void himax_resend_cmd_func(bool suspended);
 extern void himax_rst_cmd_recovery_func(bool suspended);
@@ -430,11 +423,7 @@ update_retry:
         ic_data->vendor_fw_ver = g_i_FW_VER;
         ic_data->vendor_config_ver = g_i_CFG_VER;
         result = 1;//upgrade success
-        //sprintf(wind_device_info.ctp_module_info.fwvr, "0x%x", ic_data->vendor_config_ver);
 	if(!strcmp("dsi_boe66_st7703_720p_video", caPanelName)) {
-        //wind_device_info.ctp_module_info.vendor = 0x05;
-        //sprintf(wind_device_info.ctp_module_info.ic_name, "%s", "HX8527-E44-L");
-        //sprintf(wind_device_info.ctp_module_info.fwvr, "0x%x", ic_data->vendor_config_ver);			
         }
         I("%s: TP upgrade OK\n", __func__);
     }
@@ -2158,23 +2147,6 @@ int himax_chip_common_probe(struct i2c_client *client, const struct i2c_device_i
         himax_int_enable(client->irq,0);
     }
 #endif
-
-/*	#ifdef CONFIG_WIND_DEVICE_INFO
-	{	
-		sprintf(wind_device_info.ctp_module_info.ic_name, "%s", "HX852xES");
-		sprintf(wind_device_info.ctp_module_info.fwvr, "0x%x", ic_data->vendor_config_ver);
-		wind_device_info.ctp_module_info.vendor = 0x01;
-		if(!strcmp("dsi_boe66_st7703_720p_video", caPanelName)) {
-                wind_device_info.ctp_module_info.vendor = 0x05;
-                sprintf(wind_device_info.ctp_module_info.ic_name, "%s", "HX8527-E44-L");
-                sprintf(wind_device_info.ctp_module_info.fwvr, "0x%x", ic_data->vendor_config_ver);			
-        }
-	}
-		
-		//printk("test update_msg.ic_fw_msg.vid=%04x\n", update_msg.ic_fw_msg.vid);
-#endif*/
-//hebiao@wind-mobi.com 20171127 end	
-
 
 	printk("himax probe_end %s %d\n", __func__, __LINE__);
 	

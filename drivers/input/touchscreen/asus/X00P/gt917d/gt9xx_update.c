@@ -2471,54 +2471,6 @@ s32 gup_update_proc(void *dir)
         update_ret = SUCCESS;
     }
 
-#if 0
-//hebiao@wind-mobi.com 20171127 begin
-#ifdef CONFIG_WIND_DEVICE_INFO
-	{	
-			u8 cfg_version = 0;
-			u8  pid[8] = {0};		/* product id   */
-			u16 vid = 0;
-			u8  buf[16] = {0};
-			u8 sensor_id = 0;
-
-			ret = gtp_i2c_read_dbl_check(ts->client, GTP_REG_SENSOR_ID, &sensor_id, 1);
-    		if (SUCCESS != ret)
-    		{
-        		printk("gtp read sensor_id failed\n");
-    		}
-				
-			ret = gtp_i2c_read_dbl_check(ts->client, GTP_REG_CONFIG_DATA, &cfg_version, 1);
-	    	if (ret != SUCCESS) {
-	        	printk("gtp read cfg_version failed\n");
-	    	}
-
-			ret = gtp_i2c_read_dbl_check(ts->client, GUP_REG_PID_VID, &buf[GTP_ADDR_LENGTH], 6);
-    		if (FAIL == ret)
-    		{
-        		printk("gtp read pid_vid failed\n");
-       
-   			}
-
-			memset(pid, 0, sizeof(pid));
-    		memcpy(pid, &buf[GTP_ADDR_LENGTH], 4);
-			vid = buf[GTP_ADDR_LENGTH+4] + (buf[GTP_ADDR_LENGTH+5]<<8);
-			
-			sprintf(wind_device_info.ctp_module_info.ic_name, "%s", pid);
-			sprintf(wind_device_info.ctp_module_info.fwvr, "%04x", vid);
-			sprintf(&(wind_device_info.ctp_module_info.fwvr[4]), "-%02x", cfg_version);
-			wind_device_info.ctp_module_info.vendor = sensor_id;
-
-			//printk("test sensor_id=%d\n", sensor_id);
-			//printk("test update_msg.ic_fw_msg.pid=%s\n", pid);
-			//printk("test update_msg.ic_fw_msg.vid=%04x\n", vid);
-			//printk("test %s %d cfg_version=%02x\n", __func__, __LINE__, cfg_version);
-		
-	}
-		
-#endif
-//hebiao@wind-mobi.com 20171127 end	
-#endif
-	
 update_fail:
     GTP_DEBUG("[update_proc]leave update mode.");
     gup_leave_update_mode();
