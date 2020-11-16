@@ -2869,26 +2869,6 @@ static ssize_t himax_SMWP_write(struct file *file, const char *buff,
     {
         return -EFAULT;
     }
-//zhaopengfei@wind-mobi.com 20180410 begin >> hx83102_gestrue_flag 
-
-    if (buf[0] == '0')
-    {
-        ts->SMWP_enable = 0;
-        hx83102_gestrue_flag=0;
-        zpf("himax_SMWP_write >>>>hx83102_gestrue_flag=%d",hx83102_gestrue_flag);
-    }
-    else if (buf[0] == '1')
-    {
-        ts->SMWP_enable = 1;
-        if(all_gesture_disable_flag != 0){
-            hx83102_gestrue_flag = 0;
-        }
-        else{
-            hx83102_gestrue_flag = 1;
-        }
-        zpf("himax_SMWP_write >>>>hx83102_gestrue_flag=%d",hx83102_gestrue_flag);
-    }
-//zhaopengfei@wind-mobi.com 20180410 end >> hx83102_gestrue_flag 
     else
         return -EINVAL;
 
@@ -2949,65 +2929,6 @@ static ssize_t himax_GESTURE_read(struct file *file, char *buf,
 static ssize_t himax_GESTURE_write(struct file *file, const char *buff,
                                    size_t len, loff_t *pos)
 {
-    struct hx_83102_ts_data *ts = hx83102_ts;
-    int i =0;
-    char buf[80] = {0};
-	
-// zhaopengfei@wind-mobi.com 20180410 begin >>> [4/5] realize the touch panel gesture feature
-	char drvbuf[80] = {0};
-    if (len >= 80)
-    {
-        I("%s: no command exceeds 80 chars.\n", __func__);
-        return -EFAULT;
-    }
-    if (copy_from_user(buf, buff, len))
-    {
-        return -EFAULT;
-    }
-
-    drvbuf[0]  = buf[0];
-    drvbuf[1]  = buf[1];
-    drvbuf[11] = buf[2];
-    drvbuf[9]  = buf[3];
-    drvbuf[12] = buf[4];
-    drvbuf[5]  = buf[5];
-    drvbuf[6]  = buf[6];
-    drvbuf[10] = buf[7];
-
-    buf[8] = '\0';
-    zpf("gesture flag: %s", buf);
-    for (i = 0; i < 8; i++)
-    {
-        if(buf[i] != '0')
-        {
-            all_gesture_disable_flag = 0;
-            if(ts->SMWP_enable != 0)
-                hx83102_gestrue_flag = 1;
-            break;
-        }
-    }
-
-    if(i > 7)
-    {
-        zpf("i=%d",i);
-        all_gesture_disable_flag = 1;
-        hx83102_gestrue_flag = 0;
-    }
-    zpf("hx83102_gestrue_flag=%d all_gesture_disable_flag= %d",hx83102_gestrue_flag,all_gesture_disable_flag);
-
-    I("himax_GESTURE_store= %s \n",buf);
-    for (i=0; i<16; i++)
-    {
-        if (drvbuf[i] == '0')
-            ts->gesture_cust_en[i]= 0;
-        else if (drvbuf[i] == '1')
-            ts->gesture_cust_en[i]= 1;
-        else
-            ts->gesture_cust_en[i]= 0;
-        I("gesture en[%d]=%d \n", i, ts->gesture_cust_en[i]);
-    }
-// zhaopengfei@wind-mobi.com 20180410 end >>> [4/5] realize the touch panel gesture feature
-
     return len;
 }
 

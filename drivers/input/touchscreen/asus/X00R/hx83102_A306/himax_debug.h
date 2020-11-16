@@ -18,8 +18,6 @@
 #include "himax_platform.h"
 #include "himax_common.h"
 
-extern int hx83102_gestrue_flag;	//zhaopengfei@wind-mobi.com 20180410 add
-
 #ifdef HX_ESD_RECOVERY
 extern u8 HX83102_ESD_RESET_ACTIVATE;
 extern 	int hx83102_EB_event_flag;
