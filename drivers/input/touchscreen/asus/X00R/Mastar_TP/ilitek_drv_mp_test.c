@@ -3544,7 +3544,7 @@ static u16 _DrvMpTestMsg28xxItoTestChooseTpType(void)
 
 		_gMsg28xx_AnaGen_Version = ANAGEN_VER_Y;
 		
-        if ((_gMsg28xx_PATTERN_TYPE == 5))
+        if (_gMsg28xx_PATTERN_TYPE == 5)
         {
             _gMsg28xx_CFB_REF = CFB_REF_Y;
             _gMsg28xx_DC_RANGE = DC_RANGE_Y;

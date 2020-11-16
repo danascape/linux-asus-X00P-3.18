@@ -12030,7 +12030,7 @@ static s32 _DrvSelfParsePacket(u8 *pPacket, u16 nLength, SelfTouchInfo_t *pInfo)
                     szY[i] = pInfo->tPoint[i].nY;
                 }
 			
-                if (/*(pInfo->nFingerNum == 1)&&*/(nPrevTouchNum == 2))
+                if (/*(pInfo->nFingerNum == 1)&&*/nPrevTouchNum == 2)
                 {
                     if (_DrvPointDistance(szX[0], szY[0], szPrevX[0], szPrevY[0]) > _DrvPointDistance(szX[0], szY[0], szPrevX[1], szPrevY[1]))
                     {
@@ -12343,7 +12343,7 @@ static s32 _DrvSelfParsePacket(u8 *pPacket, u16 nLength, SelfTouchInfo_t *pInfo)
                     szY[i] = pInfo->tPoint[i].nY;
                 }
 			
-                if (/*(pInfo->nFingerNum == 1)&&*/(nPrevTouchNum == 2))
+                if (/*(pInfo->nFingerNum == 1)&&*/nPrevTouchNum == 2)
                 {
                     if (_DrvPointDistance(szX[0], szY[0], szPrevX[0], szPrevY[0]) > _DrvPointDistance(szX[0], szY[0], szPrevX[1], szPrevY[1]))
                     {

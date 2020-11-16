@@ -1074,7 +1074,7 @@ int msg28xx_open_judge(int *deltac_data, int deltac_size)
     nCSub = mp_test_data->Open_test_csub;
 
     /* if open mode is sine mode, Csub must be zero. */
-    if ((mp_test_data->Open_mode == 1))
+    if (mp_test_data->Open_mode == 1)
     	nCSub = 0;
 
     if (!mp_test_data->Open_test_cfb)
@@ -1372,7 +1372,7 @@ int msg30xx_open_judge(int *deltac_data, int deltac_size)
     nCSub = mp_test_data->Open_test_csub;
 
     /* if open mode is sine mode, Csub must be zero. */
-    if ((mp_test_data->Open_mode == 1))
+    if (mp_test_data->Open_mode == 1)
     	nCSub = 0;
 
     if (!mp_test_data->Open_test_cfb)
