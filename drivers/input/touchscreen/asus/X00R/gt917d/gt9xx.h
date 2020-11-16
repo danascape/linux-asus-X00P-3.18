@@ -77,7 +77,7 @@
 #define GTP_GESTURE_WAKEUP    1    // gesture wakeup 
 #define GTP_GLOVE_MODE    1
 
-#define GTP_CHARGER_SWITCH    1  //lihaiyan@wind-mobi.com 20171202 
+#define GTP_CHARGER_SWITCH    0  //lihaiyan@wind-mobi.com 20171202 
 //hebiao@wind-mobi.com 20160907 end
 
 #define GTP_DEBUG_ON          1

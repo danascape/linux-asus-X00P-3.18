@@ -83,7 +83,7 @@ void himax_touch_proc_deinit(void);
 //#define HX_GESTURE_TRACK
 #define HX_HIGH_SENSE
 //#define HX_PALM_REPORT
-#define HX_USB_DETECT_GLOBAL
+//#define HX_USB_DETECT_GLOBAL
 //#define HX_USB_DETECT_CALLBACK
 //#define HX_PROTOCOL_A					/* for MTK special platform.If turning on,it will report to system by using specific format. */
 #define HX_RESUME_HW_RESET
