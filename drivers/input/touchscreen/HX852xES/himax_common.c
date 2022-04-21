@@ -25,17 +25,53 @@
 extern void himax_ic_reset(uint8_t loadconfig,uint8_t int_off);
 #endif
 
+//wangjun@wind-mobi.com 20180314 begin 
+extern char caPanelName[];
+//wangjun@wind-mobi.com 20180314 end 
+
 #if defined(HX_AUTO_UPDATE_FW)
+// wangjun@wind-mobi.com 20180314 begin
 unsigned char i_CTPM_FW[]=
 {
+// wangjun@wimd-mobi.com 20180301 begin
 #include "LC_E300_C01_2018-01-15.i"
+// wangjun@wimd-mobi.com 20180301 end
 };
+
+
+// qcom,mdss-dsi-panel-name = "st7703 720p video mode dsi panel";
+unsigned char YKL_PANDA_ILI9881_HX8527[]=
+{
+// wangjun@wimd-mobi.com 20180301 begin
+#include "EK55M_YJ_ASUS_E300_CID3702_C33_06082018.i"
+// wangjun@wimd-mobi.com 20180301 end
+};
+
+
+// qcom,mdss-dsi-panel-name = "dsi_boe55_st7703_720p_video";
+unsigned char LC_BOE_ST7730_HX8527[]=
+{
+// wangjun@wimd-mobi.com 20180301 begin
+#include "LC_LTFBF0551536_ASUS_CID3700_E300_C06_05302018.i"
+// wangjun@wimd-mobi.com 20180301 end
+};
+
+// qcom,mdss-dsi-panel-name = "dsi_boe66_st7703_720p_video";
+unsigned char LC_BOE66_ST7730_HX8527[]=
+{
+// zhaopengfei@wimd-mobi.com 20180925 begin	>>TP6_FW_UPDATE
+#include "LTFBF0551536_LC_ASUS_A306_CID3702_5A_C35_0903-040630.i"
+// zhaopengfei@wimd-mobi.com 20180925 end	>>TP6_FW_UPDATE
+};
+// wangjun@wind-mobi.com 20180314 end
+
+
 #endif
 
 //hebiao@wind-mobi.com 20171127 begin
 #ifdef CONFIG_WIND_DEVICE_INFO
-#include "wind_device_info.h"
-extern wind_device_info_t wind_device_info;
+//#include "wind_device_info.h"
+//extern wind_device_info_t wind_device_info;
 #endif
 //hebiao@wind-mobi.com 20171127 end
 
@@ -75,7 +111,7 @@ int g_i_CID_MAJ = 0; //GUEST ID
 int g_i_CID_MIN = 0; //VER for GUEST
 #endif
 
-unsigned char	HIMAX_IC_TYPE = 11;
+unsigned char	IC_TYPE1 = 11;
 unsigned char	IC_CHECKSUM = 0;
 
 #ifdef HX_ESD_RECOVERY
@@ -265,7 +301,8 @@ int himax_input_register(struct himax_ts_data *ts)
     input_mt_init_slots(ts->input_dev, ts->nFinger_support);
 #endif
 #endif
-
+	ts->pdata->abs_x_max = 720;
+	ts->pdata->abs_y_max = 1440;
     I("input_set_abs_params: mix_x %d, max_x %d, min_y %d, max_y %d\n",
       ts->pdata->abs_x_min, ts->pdata->abs_x_max, ts->pdata->abs_y_min, ts->pdata->abs_y_max);
 
@@ -323,9 +360,37 @@ void calculate_point_number(void)
 static int i_update_FW(void)
 {
     int upgrade_times = 0;
-    unsigned char* ImageBuffer = i_CTPM_FW;
-    int fullFileLength = sizeof(i_CTPM_FW);
     uint8_t ret = 0, result = 0;
+    // wangjun@wind-mobi.com 20183014 begin
+    unsigned char* ImageBuffer = NULL;
+    int fullFileLength = 0;
+
+
+    if(!strcmp("jdf_lianovation_st7703_720p_video",caPanelName)){
+
+        ImageBuffer = LC_BOE_ST7730_HX8527;
+        fullFileLength = sizeof(LC_BOE_ST7730_HX8527);
+        printk("[wjwind] current Update = %s\n",caPanelName);
+    }
+    else if(!strcmp("ykl_panda_ili9881_720p_video",caPanelName))
+    {
+        ImageBuffer = YKL_PANDA_ILI9881_HX8527;
+        fullFileLength = sizeof(YKL_PANDA_ILI9881_HX8527);
+        printk("[wjwind] current Update = %s\n",caPanelName);
+    }else if(!strcmp("dsi_boe66_st7703_720p_video",caPanelName))
+    {
+        ImageBuffer = LC_BOE66_ST7730_HX8527;
+        fullFileLength = sizeof(LC_BOE66_ST7730_HX8527);
+        printk("[wjwind] current Update = %s\n",caPanelName);
+    }
+    else
+    {
+        ImageBuffer = i_CTPM_FW;
+        fullFileLength = sizeof(i_CTPM_FW);
+        printk("[wjwind] current Update = %s\n",caPanelName);
+    }
+
+    // wangjun@wind-mobi.com 20183014 end
 
     I("%s: i_fullFileLength = %d\n", __func__,fullFileLength);
 
@@ -365,7 +430,12 @@ update_retry:
         ic_data->vendor_fw_ver = g_i_FW_VER;
         ic_data->vendor_config_ver = g_i_CFG_VER;
         result = 1;//upgrade success
-        sprintf(wind_device_info.ctp_module_info.fwvr, "0x%x", ic_data->vendor_config_ver);
+        //sprintf(wind_device_info.ctp_module_info.fwvr, "0x%x", ic_data->vendor_config_ver);
+	if(!strcmp("dsi_boe66_st7703_720p_video", caPanelName)) {
+        //wind_device_info.ctp_module_info.vendor = 0x05;
+        //sprintf(wind_device_info.ctp_module_info.ic_name, "%s", "HX8527-E44-L");
+        //sprintf(wind_device_info.ctp_module_info.fwvr, "0x%x", ic_data->vendor_config_ver);			
+        }
         I("%s: TP upgrade OK\n", __func__);
     }
 #ifdef HX_RST_PIN_FUNC
@@ -596,13 +666,26 @@ static int himax_parse_wake_event(struct himax_ts_data *ts)
 
 void himax_wake_check_func(void)
 {
+// wangbing@wind-mobi.com 20180319 begin >>> [1/5] realize the touch panel gesture feature
+    struct himax_ts_data *ts = private_ts;
     int ret_event = 0, KEY_EVENT = 0;
-
     ret_event = himax_parse_wake_event(private_ts);
+    if(0x80 == ret_event) {
+        paul("ret_event = %d enable = %d", ret_event, ts->gesture_cust_en[0]);
+        if(ts->gesture_cust_en[0] != 1)
+            return;
+    } else if(ret_event > 0 && ret_event < 16) {
+        paul("ret_event = %d enable = %d", ret_event, ts->gesture_cust_en[ret_event]);
+        if(ts->gesture_cust_en[ret_event] != 1)
+            return;
+    }
+// wangbing@wind-mobi.com 20180319 end   <<< [1/5] realize the touch panel gesture feature
+
+
     switch (ret_event)
     {
     case EV_GESTURE_PWR:
-        KEY_EVENT = KEY_POWER;
+        KEY_EVENT = KEY_F21;
         break;
     case EV_GESTURE_01:
         KEY_EVENT = KEY_CUST_01;
@@ -949,7 +1032,7 @@ mem_alloc_fail:
 }
 
 
-#if defined(HX_USB_DETECT_GLOBAL)
+#if 0
 void himax_cable_detect_func(bool force_renew)
 {
     struct himax_ts_data *ts;
@@ -1488,7 +1571,7 @@ void himax_ts_work(struct himax_ts_data *ts)
     int j=0;
 #endif
 
-#if defined(HX_USB_DETECT_GLOBAL)
+#if 0
     himax_cable_detect_func(false);
 #endif
 
@@ -1693,6 +1776,49 @@ static void himax_ts_guest_info_work_func(struct work_struct *work)
 }
 #endif
 
+
+//hebiao@wind-mobi.com 20170825 begin
+static int himax_mag_rst_high(struct himax_ts_data *ts)
+{
+	int retval;
+	ts->himax_pinctrl = devm_pinctrl_get(&(ts->client->dev));
+	if (IS_ERR_OR_NULL(ts->himax_pinctrl)) {
+		retval = PTR_ERR(ts->himax_pinctrl);
+		dev_dbg(&ts->client->dev,
+		"Target does not use pinctrl %d\n", retval);
+
+		printk("%s %d get dev failed\n", __func__, __LINE__);
+		goto err_pinctrl_get;
+	}
+	
+	//mag begin 
+	ts->mag_output_high2
+	= pinctrl_lookup_state(ts->himax_pinctrl,"mag_output_high");
+	if (IS_ERR_OR_NULL(ts->mag_output_high2)) {
+		retval = PTR_ERR(ts->mag_output_high2);
+		dev_dbg(&ts->client->dev,
+		"Can not lookup %s pinstate %d\n",
+		"mag_output_high", retval);
+
+		printk("%s %d get dev failed\n", __func__, __LINE__);
+		goto err_pinctrl_lookup;
+	}	
+	//mag end
+	
+	return 0;
+	
+	err_pinctrl_lookup:
+	devm_pinctrl_put(ts->himax_pinctrl);
+	err_pinctrl_get:
+	ts->himax_pinctrl = NULL;
+	return retval;
+}
+//hebiao@wind-mobi.com 20170825 end
+
+
+
+
+
 #ifdef  HX_TP_PROC_DIAG
 static void himax_ts_diag_work_func(struct work_struct *work)
 {
@@ -1706,9 +1832,16 @@ int himax_chip_common_probe(struct i2c_client *client, const struct i2c_device_i
     bool auto_update_flag = false;
     struct himax_ts_data *ts;
     struct himax_i2c_platform_data *pdata;
+	extern int tp_flag;
 
     //Check I2C functionality
 	printk("himax probe_begin %s %d\n", __func__, __LINE__);
+	
+	if (tp_flag) {
+		printk("other tp have registered, exit himax probe\n");
+		return -EINVAL;
+	}
+	
 	
     if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C))
     {
@@ -1762,6 +1895,8 @@ int himax_chip_common_probe(struct i2c_client *client, const struct i2c_device_i
     ts->rst_gpio = pdata->gpio_reset;
 #endif
 
+	private_ts = ts;
+
     himax_gpio_power_config(ts->client, pdata);
 
 #ifndef CONFIG_OF
@@ -1775,15 +1910,28 @@ int himax_chip_common_probe(struct i2c_client *client, const struct i2c_device_i
         }
     }
 #endif
-    private_ts = ts;
 
     if (himax_ic_package_check(ts->client) == false)
     {
         E("Himax chip doesn NOT EXIST");
 		printk("himax probe %s %d\n", __func__, __LINE__);
+		himax_power_on(false);
         goto err_ic_package_failed;
     }
 
+	tp_flag = 1; //hebiao added for tp conpatible
+
+//added by hebiao for mag rst high begin
+	himax_mag_rst_high(ts);  //added by hebiao for mag rst high
+	if (pinctrl_select_state(ts->himax_pinctrl, ts->mag_output_high2) < 0) {
+		dev_err(&ts->client->dev,
+		"failed to select pin to active state");
+
+		printk("%s %d get dev failed\n", __func__, __LINE__);
+	}
+//added by hebiao for mag rst high end
+
+	
     if (pdata->virtual_key)
         ts->button = pdata->virtual_key;
 #ifdef  HX_TP_PROC_FLASH_DUMP
@@ -1967,7 +2115,7 @@ int himax_chip_common_probe(struct i2c_client *client, const struct i2c_device_i
 #endif
 
 #ifdef HX_SMART_WAKEUP
-    ts->SMWP_enable=1;//hongfan@wind-mobi 20180206 add
+    ts->SMWP_enable = 0;//hongfan@wind-mobi 20180206 add
     wake_lock_init(&ts->ts_SMWP_wake_lock, WAKE_LOCK_SUSPEND, HIMAX_common_NAME);
 #endif
 #ifdef HX_HIGH_SENSE
@@ -2011,15 +2159,20 @@ int himax_chip_common_probe(struct i2c_client *client, const struct i2c_device_i
     }
 #endif
 
-	#ifdef CONFIG_WIND_DEVICE_INFO
+/*	#ifdef CONFIG_WIND_DEVICE_INFO
 	{	
 		sprintf(wind_device_info.ctp_module_info.ic_name, "%s", "HX852xES");
 		sprintf(wind_device_info.ctp_module_info.fwvr, "0x%x", ic_data->vendor_config_ver);
 		wind_device_info.ctp_module_info.vendor = 0x01;
+		if(!strcmp("dsi_boe66_st7703_720p_video", caPanelName)) {
+                wind_device_info.ctp_module_info.vendor = 0x05;
+                sprintf(wind_device_info.ctp_module_info.ic_name, "%s", "HX8527-E44-L");
+                sprintf(wind_device_info.ctp_module_info.fwvr, "0x%x", ic_data->vendor_config_ver);			
+        }
 	}
 		
 		//printk("test update_msg.ic_fw_msg.vid=%04x\n", update_msg.ic_fw_msg.vid);
-#endif
+#endif*/
 //hebiao@wind-mobi.com 20171127 end	
 
 
@@ -2127,6 +2280,25 @@ int himax_chip_common_remove(struct i2c_client *client)
 
 }
 
+
+
+static void himax_report_all_leave(struct himax_ts_data *ts)
+{
+    int loop_i = 0;
+
+    for (loop_i = 0; loop_i < ts->nFinger_support; loop_i++)
+    {
+#ifndef HX_PROTOCOL_A
+        input_mt_slot(ts->input_dev, loop_i);
+        input_mt_report_slot_state(ts->input_dev, MT_TOOL_FINGER, 0);
+#endif
+    }
+    input_report_key(ts->input_dev, BTN_TOUCH, 0);
+    input_sync(ts->input_dev);
+}
+
+
+
 int himax_chip_common_suspend(struct himax_ts_data *ts)
 {
     int ret;
@@ -2198,6 +2370,7 @@ int himax_chip_common_suspend(struct himax_ts_data *ts)
         ts->pre_finger_mask = 0;
         FAKE_POWER_KEY_SEND=false;
         I("[himax] %s: SMART_WAKEUP enable, reject suspend\n",__func__);
+		himax_report_all_leave(ts);
         return 0;
     }
 #endif
@@ -2219,6 +2392,7 @@ int himax_chip_common_suspend(struct himax_ts_data *ts)
     if (ts->pdata->powerOff3V3 && ts->pdata->power)
         ts->pdata->power(0);
     I("%s: END \n", __func__);
+	himax_report_all_leave(ts);
     return 0;
 }
 
@@ -2264,15 +2438,13 @@ int himax_chip_common_resume(struct himax_ts_data *ts)
     }
 #endif
 
-#if defined(HX_SMART_WAKEUP)||defined(HX_HIGH_SENSE)||defined(HX_USB_DETECT_GLOBAL)
-#if defined(HX_RESUME_SEND_CMD)
+// wangbing@wind-mobi.com 2018322 begin >>> [1/1] solve the glove function failure after resume
+#if defined(HX_SMART_WAKEUP)||defined(HX_HIGH_SENSE)||defined(HX_USB_DETECT_GLOBAL) 
     himax_resend_cmd_func(ts->suspended);
-#endif
-#endif
-
-#if defined(HX_RESUME_HW_RESET)
+#elif defined(HX_RESUME_HW_RESET)
     himax_ic_reset(false,false);
 #endif
+// wangbing@wind-mobi.com 2018322 end   <<< [1/1] solve the glove function failure after resume
 
     himax_resume_ic_action(ts->client);
 

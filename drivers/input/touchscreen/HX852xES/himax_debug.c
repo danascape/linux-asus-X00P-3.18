@@ -21,7 +21,7 @@
 
 extern struct himax_ic_data* ic_data;
 extern struct himax_ts_data *private_ts;
-extern unsigned char	HIMAX_IC_TYPE;
+extern unsigned char	IC_TYPE1;
 extern unsigned char	IC_CHECKSUM;
 extern int himax_input_register(struct himax_ts_data *ts);
 #ifdef HX_CHIP_STATUS_MONITOR
@@ -217,7 +217,7 @@ static ssize_t himax_vendor_read(struct file *file, char *buf,
 		temp_buf = kzalloc(len,GFP_KERNEL);
         ret += snprintf(temp_buf + ret, len - ret, "FW_VER = 0x%2.2X \n",ic_data->vendor_fw_ver);
 
-        if(HIMAX_IC_TYPE < 8)
+        if(IC_TYPE1 < 8)
             ret += snprintf(temp_buf + ret, len - ret, "CONFIG_VER = 0x%2.2X \n",ic_data->vendor_config_ver);
         else
         {
@@ -1772,7 +1772,7 @@ static ssize_t himax_debug_read(struct file *file, char *buf,
         {
             ret += snprintf(temp_buf + ret, len - ret, "FW_VER = 0x%2.2X \n",ic_data->vendor_fw_ver);
 
-            if(HIMAX_IC_TYPE < 8)
+            if(IC_TYPE1 < 8)
                 ret += snprintf(temp_buf + ret, len - ret, "CONFIG_VER = 0x%2.2X \n",ic_data->vendor_config_ver);
             else
             {
@@ -1797,7 +1797,7 @@ static ssize_t himax_debug_read(struct file *file, char *buf,
         else if (debug_level_cmd == 'd')
         {
             ret += snprintf(temp_buf + ret, len - ret, "Himax Touch IC Information :\n");
-            switch(HIMAX_IC_TYPE)
+            switch(IC_TYPE1)
             {
             case HX_85XX_D_SERIES_PWON:
                 ret += snprintf(temp_buf + ret, len - ret, "IC Type : HX852xD\n");
@@ -2657,7 +2657,11 @@ static ssize_t himax_self_test_read(struct file *file, char *buf,
     if(!HX_PROC_SEND_FLAG)
     {
 		temp_buf = kzalloc(len,GFP_KERNEL);
-
+		if(!temp_buf){
+			printk("zhangkai himax_self_test_read kzalloc failed !\n ");
+			return ret;
+		}
+		
         himax_int_enable(private_ts->client->irq,0);//disable irq
         g_self_test_entered = 1;
         val = himax_chip_self_test(private_ts->client);
@@ -2808,7 +2812,10 @@ static ssize_t himax_HSEN_write(struct file *file, const char *buff,
     else
         return -EINVAL;
 
-    himax_set_HSEN_enable(ts->client, ts->HSEN_enable, ts->suspended);
+// wangbing@wind-mobi.com 20180529 begin >>> [1/5] modify the i2c transform times
+    // himax_set_HSEN_enable(ts->client, ts->HSEN_enable, ts->suspended);
+    himax_set_work_status(ts->client, ts->SMWP_enable, ts->HSEN_enable, ts->suspended);
+// wangbing@wind-mobi.com 20180529 end   <<< [1/5] modify the i2c transform times
 
     I("%s: HSEN_enable = %d.\n", __func__, ts->HSEN_enable);
 
@@ -2875,7 +2882,10 @@ static ssize_t himax_SMWP_write(struct file *file, const char *buff,
     else
         return -EINVAL;
 
-    himax_set_SMWP_enable(ts->client, ts->SMWP_enable, ts->suspended);
+// wangbing@wind-mobi.com 20180529 begin >>> [2/5] modify the i2c transform times
+    // himax_set_SMWP_enable(ts->client, ts->SMWP_enable, ts->suspended);
+    himax_set_work_status(ts->client, ts->SMWP_enable, ts->HSEN_enable, ts->suspended);
+// wangbing@wind-mobi.com 20180529 end   <<< [2/5] modify the i2c transform times
 
     HX_SMWP_EN = ts->SMWP_enable;
     I("%s: SMART_WAKEUP_enable = %d.\n", __func__, HX_SMWP_EN);
@@ -2894,16 +2904,29 @@ static ssize_t himax_GESTURE_read(struct file *file, char *buf,
                                   size_t len, loff_t *pos)
 {
     struct himax_ts_data *ts = private_ts;
-    int i =0;
     ssize_t ret = 0;
     char *temp_buf;
 
     if(!HX_PROC_SEND_FLAG)
     {
-		temp_buf = kzalloc(len,GFP_KERNEL);
 
+// wangbing@wind-mobi.com 20180319 begin >>> [5/5] realize the touch panel gesture feature
+        temp_buf = kzalloc(len, GFP_KERNEL);
+        ret = snprintf(temp_buf, len, "double_click: %d \n up: %d \n w: %d \n s: %d \n e: %d \n c: %d \n z: %d \n v: %d \n",
+                ts->gesture_cust_en[0],
+                ts->gesture_cust_en[1],
+                ts->gesture_cust_en[11],
+                ts->gesture_cust_en[9],
+                ts->gesture_cust_en[12],
+                ts->gesture_cust_en[5],
+                ts->gesture_cust_en[6],
+                ts->gesture_cust_en[10]);
+/*
         for(i=0; i<16; i++)
             ret += snprintf(temp_buf + ret, len - ret, "ges_en[%d]=%d \n",i,ts->gesture_cust_en[i]);
+*/
+// wangbing@wind-mobi.com 20180319 end   <<< [5/5] realize the touch panel gesture feature
+
         if(copy_to_user(buf, temp_buf, len))
             I("%s,here:%d\n",__func__,__LINE__);
         kfree(temp_buf);
@@ -2924,6 +2947,9 @@ static ssize_t himax_GESTURE_write(struct file *file, const char *buff,
     int i =0;
     char buf[80] = {0};
 
+// wangbing@wind-mobi.com 20180319 begin >>> [4/5] realize the touch panel gesture feature
+    char drvbuf[80] = {0};
+
     if (len >= 80)
     {
         I("%s: no command exceeds 80 chars.\n", __func__);
@@ -2934,17 +2960,28 @@ static ssize_t himax_GESTURE_write(struct file *file, const char *buff,
         return -EFAULT;
     }
 
+    drvbuf[0]  = buf[0];
+    drvbuf[1]  = buf[1];
+    drvbuf[11] = buf[2];
+    drvbuf[9]  = buf[3];
+    drvbuf[12] = buf[4];
+    drvbuf[5]  = buf[5];
+    drvbuf[6]  = buf[6];
+    drvbuf[10] = buf[7];
+
     I("himax_GESTURE_store= %s \n",buf);
     for (i=0; i<16; i++)
     {
-        if (buf[i] == '0')
+        if (drvbuf[i] == '0')
             ts->gesture_cust_en[i]= 0;
-        else if (buf[i] == '1')
+        else if (drvbuf[i] == '1')
             ts->gesture_cust_en[i]= 1;
         else
             ts->gesture_cust_en[i]= 0;
         I("gesture en[%d]=%d \n", i, ts->gesture_cust_en[i]);
     }
+// wangbing@wind-mobi.com 20180319 end   <<< [4/5] realize the touch panel gesture feature
+
     return len;
 }
 

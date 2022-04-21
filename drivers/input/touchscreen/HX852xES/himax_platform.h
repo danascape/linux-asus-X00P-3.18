@@ -30,6 +30,10 @@
 #define QCT
 #define CONFIG_TOUCHSCREEN_HIMAX_DEBUG
 
+// wangbing@wind-mobi.com 2018316 begin <<< [1/1] add the debug log
+#define paul(fmt, arg...) printk(KERN_ERR "[Paul][%s][%d] "fmt"\n", __func__, __LINE__, ##arg)
+// wangbing@wind-mobi.com 2018316 end   <<< [1/1] add the debug log
+
 #if defined(CONFIG_TOUCHSCREEN_HIMAX_DEBUG)
 #define D(x...) printk("[HXTP] " x)
 #define I(x...) printk("[HXTP] " x)
@@ -128,6 +132,8 @@ extern int himax_gpio_power_config(struct i2c_client *client,struct himax_i2c_pl
 #if defined(CONFIG_FB)
 extern int fb_notifier_callback(struct notifier_block *self, unsigned long event, void *data);
 #endif
+
+int himax_power_on(bool on);
 
 #endif
 //hebiao@wind-mobi.com 20180114 end

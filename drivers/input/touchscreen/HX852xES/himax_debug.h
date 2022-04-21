@@ -191,7 +191,11 @@ struct proc_dir_entry *himax_proc_reset_file 		= NULL;
 #endif
 
 #ifdef HX_HIGH_SENSE
-#define HIMAX_PROC_HSEN_FILE "HSEN"
+
+// wangbing@wind-mobi.com 20180322 begin >>> modify the tp glove mode
+#define HIMAX_PROC_HSEN_FILE "GLOVE_EN"
+// wangbing@wind-mobi.com 20180322 end   <<< modify the tp glove mode
+
 struct proc_dir_entry *himax_proc_HSEN_file = NULL;
 #endif
 

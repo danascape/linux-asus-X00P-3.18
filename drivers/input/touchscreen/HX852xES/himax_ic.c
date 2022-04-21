@@ -92,9 +92,17 @@ extern int g_i_CFG_VER;
 extern int g_i_CID_MAJ;
 extern int g_i_CID_MIN;
 extern unsigned char i_CTPM_FW[];
+// wangjun@wind-mobi.com 20180314 begin 
+extern unsigned char LC_BOE_ST7730_HX8527[];
+extern unsigned char LC_BOE66_ST7730_HX8527[];
+extern unsigned char YKL_PANDA_ILI9881_HX8527[];
+// wangjun@wind-mobi.com 20180314 end 
 #endif
+//wangjun@wind-mobi.com 20180314 begin 
+extern char caPanelName[256];
+//wangjun@wind-mobi.com 20180314 end 
 
-extern unsigned char	HIMAX_IC_TYPE;
+extern unsigned char	IC_TYPE1;
 extern unsigned char	IC_CHECKSUM;
 
 extern struct himax_ic_data* ic_data;
@@ -123,7 +131,7 @@ int HX_2T2R_en_setting = 0x02;//Need to check with project FW eng.
 
 #ifdef HX_USB_DETECT_GLOBAL
 //extern kal_bool upmu_is_chr_det(void);
-extern void himax_cable_detect_func(bool force_renew);
+//extern void himax_cable_detect_func(bool force_renew);
 #endif
 
 
@@ -894,6 +902,27 @@ test_retry:
 
     return pf_value;
 }
+
+// wangbing@wind-mobi.com 20180529 begin >>> [3/5] modify the i2c transform times
+void himax_set_work_status(struct i2c_client *client, uint8_t SMWP_enable, uint8_t HSEN_enable, bool suspended)
+{
+    uint8_t buf[4];
+    i2c_himax_read(client, 0x8F, buf, 1, DEFAULT_RETRY_CNT);
+
+    if(SMWP_enable == 1 && suspended)
+        buf[0] = 0x20 ;
+    else
+        buf[0] = 0x00;
+
+    if(HSEN_enable == 1 && !suspended)
+        buf[0] = 0x40;
+    else
+        buf[0] &= 0xBF;
+
+    if ( i2c_himax_write(client, 0x8F,buf, 1, DEFAULT_RETRY_CNT) < 0)
+        E("%s i2c write fail.\n",__func__);
+}
+// wangbing@wind-mobi.com 20180529 end   <<< [3/5] modify the i2c transform times
 
 void himax_set_HSEN_enable(struct i2c_client *client, uint8_t HSEN_enable, bool suspended)
 {
@@ -1684,9 +1713,9 @@ void himax_touch_information(struct i2c_client *client)
 #ifndef HX_FIX_TOUCH_INFO
     char data[12] = {0};
 
-    I("%s:HIMAX_IC_TYPE =%d\n", __func__,HIMAX_IC_TYPE);
+    I("%s:IC_TYPE1 =%d\n", __func__,IC_TYPE1);
 
-    if(HIMAX_IC_TYPE == HX_85XX_ES_SERIES_PWON)
+    if(IC_TYPE1 == HX_85XX_ES_SERIES_PWON)
     {
         data[0] = 0x8C;
         data[1] = 0x14;
@@ -1992,7 +2021,7 @@ bool himax_ic_package_check(struct i2c_client *client)
     if(cmd[0] == 0x05 && cmd[1] == 0x85 &&
             (cmd[2] == 0x25 || cmd[2] == 0x26 || cmd[2] == 0x27 || cmd[2] == 0x28))
     {
-        HIMAX_IC_TYPE         		= HX_85XX_ES_SERIES_PWON;
+        IC_TYPE1         		= HX_85XX_ES_SERIES_PWON;
         IC_CHECKSUM 			= HX_TP_BIN_CHECKSUM_CRC;
         //Himax: Set FW and CFG Flash Address
         FW_VER_MAJ_FLASH_ADDR   = 133;  //0x0085
@@ -2001,8 +2030,34 @@ bool himax_ic_package_check(struct i2c_client *client)
         FW_VER_MIN_FLASH_LENG   = 1;
         FW_CFG_VER_FLASH_ADDR	= 132;  //0x0084
 #ifdef HX_AUTO_UPDATE_FW
-        g_i_FW_VER = i_CTPM_FW[FW_VER_MAJ_FLASH_ADDR]<<8 |i_CTPM_FW[FW_VER_MIN_FLASH_ADDR];
-        g_i_CFG_VER = i_CTPM_FW[FW_CFG_VER_FLASH_ADDR];
+        // wangjun@wind-mobi.com 20180314 begin
+
+        if(!strcmp("jdf_lianovation_st7703_720p_video",caPanelName)){
+
+            g_i_FW_VER = LC_BOE_ST7730_HX8527[FW_VER_MAJ_FLASH_ADDR]<<8 |LC_BOE_ST7730_HX8527[FW_VER_MIN_FLASH_ADDR];
+            g_i_CFG_VER = LC_BOE_ST7730_HX8527[FW_CFG_VER_FLASH_ADDR];
+            printk("[wjwind] current LCM = %s\n",caPanelName);
+        }
+        else if(!strcmp("ykl_panda_ili9881_720p_video",caPanelName))
+        {
+            g_i_FW_VER = YKL_PANDA_ILI9881_HX8527[FW_VER_MAJ_FLASH_ADDR]<<8 |YKL_PANDA_ILI9881_HX8527[FW_VER_MIN_FLASH_ADDR];
+            g_i_CFG_VER = YKL_PANDA_ILI9881_HX8527[FW_CFG_VER_FLASH_ADDR];
+            printk("[wjwind] current LCM = %s\n",caPanelName);
+        }else if(!strcmp("dsi_boe66_st7703_720p_video",caPanelName))
+        {
+            g_i_FW_VER = LC_BOE66_ST7730_HX8527[FW_VER_MAJ_FLASH_ADDR]<<8 |LC_BOE66_ST7730_HX8527[FW_VER_MIN_FLASH_ADDR];
+            g_i_CFG_VER = LC_BOE66_ST7730_HX8527[FW_CFG_VER_FLASH_ADDR];
+            printk("[wjwind] current LCM = %s\n",caPanelName);
+        }
+        else
+        {
+            g_i_FW_VER = i_CTPM_FW[FW_VER_MAJ_FLASH_ADDR]<<8 |i_CTPM_FW[FW_VER_MIN_FLASH_ADDR];
+            g_i_CFG_VER = i_CTPM_FW[FW_CFG_VER_FLASH_ADDR];
+            printk("[wjwind] current LCM = %s\n",caPanelName);
+        }
+        printk("[wjwind] g_i_FW_VER = 0x%x g_i_CFG_VER = 0x%x\n",g_i_FW_VER,g_i_CFG_VER);
+        // wangjun@wind-mobi.com 20180314 end
+        
         g_i_CID_MAJ = -1;
         g_i_CID_MIN = -1;
 #endif
@@ -2241,14 +2296,19 @@ void himax_resend_cmd_func(bool suspended)
 #endif
     }
 
-#ifdef HX_SMART_WAKEUP
-    himax_set_SMWP_enable(ts->client,ts->SMWP_enable,suspended);
-#endif
-#ifdef HX_HIGH_SENSE
-    himax_set_HSEN_enable(ts->client,ts->HSEN_enable,suspended);
-#endif
+// wangbing@wind-mobi.com 20180529 begin >>> [4/5] modify the i2c transform times
+// #ifdef HX_SMART_WAKEUP
+//     himax_set_SMWP_enable(ts->client,ts->SMWP_enable,suspended);
+// #endif
+// #ifdef HX_HIGH_SENSE
+//     himax_set_HSEN_enable(ts->client,ts->HSEN_enable,suspended);
+// #endif
+
+    himax_set_work_status(ts->client, ts->SMWP_enable, ts->HSEN_enable, suspended);
+// wangbing@wind-mobi.com 20180529 end   <<< [4/5] modify the i2c transform times
+
 #ifdef HX_USB_DETECT_GLOBAL
-    himax_cable_detect_func(true);
+    //himax_cable_detect_func(true);
 #endif
 }
 
