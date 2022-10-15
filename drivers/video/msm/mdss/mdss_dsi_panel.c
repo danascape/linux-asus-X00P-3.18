@@ -2842,6 +2842,8 @@ error:
 	return -EINVAL;
 }
 
+char caPanelName[MDSS_MAX_PANEL_LEN] = {0};
+
 int mdss_dsi_panel_init(struct device_node *node,
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 	int ndx)

@@ -17,6 +17,8 @@
 #include "himax_platform.h"
 #include "himax_common.h"
 #include "himax_ic.h"
+#include <linux/regulator/consumer.h>
+
 
 int i2c_error_count = 0;
 int irq_enable_count = 0;
@@ -32,6 +34,13 @@ extern uint8_t getDiagCommand(void);
 
 extern void himax_log_touch_int_devation(int touched);
 
+
+
+static int reg_set_optimum_mode_check(struct regulator *reg, int load_uA)
+{
+	return (regulator_count_voltages(reg) > 0) ?
+		regulator_set_optimum_mode(reg, load_uA) : 0;
+}
 
 int himax_dev_set(struct himax_ts_data *ts)
 {
@@ -315,7 +324,7 @@ void himax_int_enable(int irqnum, int enable)
 #ifdef HX_RST_PIN_FUNC
 void himax_rst_gpio_set(int pinnum, uint8_t value)
 {
-    // gpio_direction_output(pinnum, value);  // old
+    //gpio_direction_output(pinnum, value);  // old
     gpio_set_value(pinnum, value);
 }
 #endif
@@ -352,12 +361,14 @@ static int himax_regulator_configure(struct i2c_client *client,struct himax_i2c_
     return 0;
 };
 
-static int himax_power_on(struct himax_i2c_platform_data *pdata, bool on)
+int himax_power_on(struct himax_i2c_platform_data *pdata, bool on)
 {
     int retval;
-
+	static struct regulator *avdd;
+	
     if (on)
     {
+#if 0
         retval = regulator_enable(pdata->vcc_dig);
         if (retval)
         {
@@ -374,11 +385,52 @@ static int himax_power_on(struct himax_i2c_platform_data *pdata, bool on)
             regulator_disable(pdata->vcc_dig);
             return retval;
         }
+#endif
+		
+		avdd = regulator_get(&client->dev, "avdd");
+		if (IS_ERR(avdd)) {
+			ret = PTR_ERR(avdd);
+			avdd = NULL;
+			dev_info(&client->dev,
+				"Regulator get failed avdd ret=%d\n", ret);
+			regulator_put(avdd);
+			return -EINVAL;
+		}
+	
+		if (!IS_ERR(avdd)) {
+			ret = regulator_set_voltage(avdd, 2800000,
+						3000000);
+			if (ret) {
+				dev_err(&client->dev,
+					"Regulator set_vtg failed vdd ret=%d\n", ret);
+				return -EINVAL;
+		}
+
+		
+		ret = reg_set_optimum_mode_check(avdd,
+			10000);
+		if (ret < 0) {
+			dev_err(&client->dev,
+				"Regulator avdd set_opt failed rc=%d\n", ret);
+			 return -ENODEV;
+		}
+		ret = regulator_enable(avdd);
+		if (ret) {
+			dev_err(&client->dev,
+				"Regulator avdd enable failed ret=%d\n", ret);
+			return -ENODEV;
+		}
+	}	
+
     }
     else
     {
+#if 0
         regulator_disable(pdata->vcc_dig);
         regulator_disable(pdata->vcc_ana);
+#endif
+		regulator_disable(avdd);
+
     }
 
     return 0;
@@ -462,6 +514,7 @@ int himax_gpio_power_config(struct i2c_client *client,struct himax_i2c_platform_
         }
     }
 #endif
+	msleep(20);			//zhangkai@wind-mobi.com 20180210
     return 0;
 
 err_gpio_irq_req:
@@ -481,6 +534,81 @@ err_regulator_not_on:
 }
 
 #else
+
+int himax_power_on(bool on)
+{
+	int ret = 0;
+	static struct regulator *avdd;
+	
+    if (on)
+    {
+#if 0
+        retval = regulator_enable(pdata->vcc_dig);
+        if (retval)
+        {
+            E("%s: Failed to enable regulator vdd\n",
+              __func__);
+            return retval;
+        }
+        msleep(100);
+        retval = regulator_enable(pdata->vcc_ana);
+        if (retval)
+        {
+            E("%s: Failed to enable regulator avdd\n",
+              __func__);
+            regulator_disable(pdata->vcc_dig);
+            return retval;
+        }
+#endif
+		avdd = regulator_get(&private_ts->client->dev, "avdd");
+		if (IS_ERR(avdd)) {
+			ret = PTR_ERR(avdd);
+			avdd = NULL;
+			dev_info(&private_ts->client->dev,
+				"Regulator get failed avdd ret=%d\n", ret);
+			regulator_put(avdd);
+			return -EINVAL;
+		}
+		
+		if (!IS_ERR(avdd)) {
+			ret = regulator_set_voltage(avdd, 2800000,
+						3000000);
+			if (ret) {
+				dev_err(&private_ts->client->dev,
+					"Regulator set_vtg failed vdd ret=%d\n", ret);
+				return -EINVAL;
+		}
+
+		ret = reg_set_optimum_mode_check(avdd,
+			10000);
+		if (ret < 0) {
+			dev_err(&private_ts->client->dev,
+				"Regulator avdd set_opt failed rc=%d\n", ret);
+			 return -ENODEV;
+		}
+		ret = regulator_enable(avdd);
+		if (ret) {
+			dev_err(&private_ts->client->dev,
+				"Regulator avdd enable failed ret=%d\n", ret);
+			return -ENODEV;
+		}
+	}	
+
+    }
+    else
+    {
+#if 0
+        regulator_disable(pdata->vcc_dig);
+        regulator_disable(pdata->vcc_ana);
+#endif
+		regulator_disable(avdd);
+
+    }
+
+    return 0;
+}
+
+
 int himax_gpio_power_config(struct i2c_client *client,struct himax_i2c_platform_data *pdata)
 {
     int error=0;
@@ -503,6 +631,7 @@ int himax_gpio_power_config(struct i2c_client *client,struct himax_i2c_platform_
         }
     }
 #endif
+#if 0
     if (pdata->gpio_3v3_en >= 0)
     {
         error = gpio_request(pdata->gpio_3v3_en, "himax-3v3_en");
@@ -514,6 +643,17 @@ int himax_gpio_power_config(struct i2c_client *client,struct himax_i2c_platform_
         gpio_direction_output(pdata->gpio_3v3_en, 1);
         I("3v3_en pin =%d\n", gpio_get_value(pdata->gpio_3v3_en));
     }
+#endif
+
+	error = himax_power_on(true);
+    if (error)
+    {
+        E("Failed to power on hardware\n");
+        return error;
+    }
+//modified power at 20180503 end
+
+
     if (gpio_is_valid(pdata->gpio_irq))
     {
         /* configure touchscreen irq gpio */
@@ -749,16 +889,19 @@ static struct i2c_driver himax_common_driver =
     },
 };
 
+/*
 static void __init himax_common_init_async(void *unused, async_cookie_t cookie)
 {
     I("%s:Enter \n", __func__);
     i2c_add_driver(&himax_common_driver);
 }
+*/
 
 static int __init himax_common_init(void)
 {
     I("Himax common touch panel driver init\n");
-    async_schedule(himax_common_init_async, NULL);
+    // async_schedule(himax_common_init_async, NULL);
+    i2c_add_driver(&himax_common_driver);
     return 0;
 }
 

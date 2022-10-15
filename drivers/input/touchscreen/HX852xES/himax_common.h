@@ -335,6 +335,14 @@ struct himax_ts_data
     struct work_struct ito_test_work;
 #endif
 
+//hebiao@wind-mobi.com 20171119 begin
+	struct pinctrl *himax_pinctrl;
+	struct pinctrl_state *mag_output_high2;
+//hebiao@wind-mobi.com 20171119 end
+
+
+
+
 };
 
 #ifdef HX_CHIP_STATUS_MONITOR
@@ -369,6 +377,17 @@ void himax_set_HSEN_func(struct i2c_client *client,uint8_t HSEN_enable);
 void himax_set_SMWP_func(struct i2c_client *client,uint8_t SMWP_enable);
 extern bool FAKE_POWER_KEY_SEND;
 
+// wangbing@wind-mobi.com 20180319 begin >>> [2/5] realize the touch panel gesture feature
+#define KEY_GESTURE_DOUBLE_CLICK    KEY_F21
+#define KEY_GESTURE_UP              KEY_F21
+#define KEY_GESTURE_W               KEY_F13
+#define KEY_GESTURE_S               KEY_F22
+#define KEY_GESTURE_E               KEY_F15
+#define KEY_GESTURE_C               KEY_F23
+#define KEY_GESTURE_Z               KEY_F17
+#define KEY_GESTURE_V               KEY_F16
+// wangbing@wind-mobi.com 20180319 end   <<< [2/5] realize the touch panel gesture feature
+
 enum gesture_event_type
 {
     EV_GESTURE_01 = 0x01,
@@ -388,23 +407,24 @@ enum gesture_event_type
     EV_GESTURE_15,
     EV_GESTURE_PWR = 0x80,
 };
-//hongfan@wind-mobi 20180206 add
-#define KEY_CUST_01 0x177		//up
-#define KEY_CUST_02 0x178		//down
-#define KEY_CUST_03 0x280		//left
-#define KEY_CUST_04 0x281		//right
-#define KEY_CUST_05 0x193		//c
-#define KEY_CUST_06 0x187		//z
-#define KEY_CUST_07 0x293		//m
-#define KEY_CUST_08 0x294		//o
-#define KEY_CUST_09 0x192		//s
-#define KEY_CUST_10 0x186		//v
-#define KEY_CUST_11 0x183		//w
-#define KEY_CUST_12 0x185		//e
-#define KEY_CUST_13 263			//
-#define KEY_CUST_14 0x299		//>
-#define KEY_CUST_15 0x296		//^
-#define KEY_CUST_16 0x191		//double tap
+
+// wangbing@wind-mobi.com 20180319 begin >>> [3/5] realize the touch panel gesture feature
+#define KEY_CUST_01 KEY_GESTURE_UP  //up
+#define KEY_CUST_02 0x178           //down
+#define KEY_CUST_03 0x280           //left
+#define KEY_CUST_04 0x281           //right
+#define KEY_CUST_05 KEY_GESTURE_C   //c
+#define KEY_CUST_06 KEY_GESTURE_Z   //z
+#define KEY_CUST_07 0x293           //m
+#define KEY_CUST_08 0x294           //o
+#define KEY_CUST_09 KEY_GESTURE_S   //s
+#define KEY_CUST_10 KEY_GESTURE_V   //v
+#define KEY_CUST_11 KEY_GESTURE_W   //w
+#define KEY_CUST_12 KEY_GESTURE_E   //e
+#define KEY_CUST_13 263             //
+#define KEY_CUST_14 0x299           //>
+#define KEY_CUST_15 0x296           //^
+#define KEY_CUST_16 KEY_GESTURE_DOUBLE_CLICK    //double tap
 #endif
 
 #if defined(CONFIG_TOUCHSCREEN_HIMAX_ITO_TEST)
