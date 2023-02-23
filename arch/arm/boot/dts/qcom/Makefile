@@ -1,3 +1,7 @@
+ifeq ($(CONFIG_MACH_ASUS_X00P),y)
+dtb-$(CONFIG_ARCH_MSM8937) += msm8937-pmi8940-X00P.dtb
+else
+
 dtb-$(CONFIG_ARCH_MSM8996) += msm8996-v2-pmi8994-mtp.dtb \
 	msm8996-v2-pmi8994-pmk8001-mtp.dtb \
 	msm8996-v2-pmi8994-pm8004-mtp.dtb \
@@ -173,7 +177,25 @@ dtb-$(CONFIG_ARCH_SDX20) += sdx20-emmc-cdp.dtb \
 	sdx20-v2-emmc-pcie-ep-mtp.dtb \
 	sdx20-v2-nand-pcie-ep-mtp.dtb
 
-dtb-$(CONFIG_ARCH_MSM8937) += msm8937-pmi8940-X00P.dtb
+dtb-$(CONFIG_ARCH_MSM8937) += msm8937-rumi.dtb \
+	msm8937-pmi8950-cdp.dtb \
+	msm8937-pmi8937-cdp.dtb \
+	msm8937-pmi8940-cdp.dtb \
+	msm8937-pmi8950-ext-codec-cdp.dtb \
+	msm8937-pmi8950-mtp.dtb \
+	msm8937-pmi8937-mtp.dtb \
+	msm8937-pmi8940-mtp.dtb \
+	msm8937-pmi8950-rcm.dtb \
+	msm8937-pmi8937-rcm.dtb \
+	msm8937-pmi8940-rcm.dtb \
+	msm8937-pmi8950-qrd-sku1.dtb \
+	msm8937-pmi8937-qrd-sku2.dtb \
+	msm8937-pmi8950-qrd-sku1-dvt1.dtb \
+	msm8937-pmi8937-qrd-sku2-dvt1.dtb \
+	apq8037-pmi8950-cdp.dtb \
+	apq8037-pmi8937-cdp.dtb \
+	apq8037-pmi8950-mtp.dtb \
+	apq8037-pmi8937-mtp.dtb
 
 dtb-$(CONFIG_ARCH_MSM8917) += msm8917-rumi.dtb \
 	apq8017-pmi8937-cdp.dtb \
@@ -322,6 +344,8 @@ dtb-$(CONFIG_ARCH_MSM8909) += msm8909-pm8916-mtp.dtb \
 	msm8909-1gb-cdp.dtb \
 	apq8009-ext-codec-dragon.dtb \
 	apq8009-dragon.dtb
+
+endif
 
 ifeq ($(CONFIG_ARM64),y)
 always          := $(dtb-y)
