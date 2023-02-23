@@ -1,2 +1,3 @@
 source "drivers/misc/fingerprint/leadcore/Kconfig"
 source "drivers/misc/fingerprint/microarray/Kconfig"
+source "drivers/misc/fingerprint/sunwave/Kconfig"
